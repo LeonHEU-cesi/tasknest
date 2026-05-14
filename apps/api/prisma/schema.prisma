@@ -23,9 +23,25 @@ model User {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   emailVerifications EmailVerification[]
+  sessions           Session[]
 
   @@index([deletedAt])
   @@map("users")
+}
+
+model Session {
+  id        String   @id @db.VarChar(64)
+  userId    String   @map("user_id") @db.Uuid
+  ipAddress String?  @map("ip_address") @db.Inet
+  userAgent String?  @map("user_agent")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }
 
 model EmailVerification {

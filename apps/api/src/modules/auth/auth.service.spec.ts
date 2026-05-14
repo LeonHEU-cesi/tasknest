@@ -44,7 +44,13 @@ describe('AuthService.signup', () => {
     prisma = buildPrismaMock();
     mail = buildMailMock();
     config = buildConfigMock({ WEB_PUBLIC_URL: 'http://localhost:3000' });
-    service = new AuthService(prisma as unknown as PrismaService, mail as unknown as MailService, config);
+    const sessions = { create: vi.fn(), validate: vi.fn(), destroy: vi.fn() };
+    service = new AuthService(
+      prisma as unknown as PrismaService,
+      mail as unknown as MailService,
+      config,
+      sessions as unknown as import('./session.service').SessionService,
+    );
   });
 
   it('creates a user and dispatches the verification email', async () => {
