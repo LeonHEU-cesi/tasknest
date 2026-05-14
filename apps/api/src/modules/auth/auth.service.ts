@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  GoneException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { hash } from '@node-rs/argon2';
 import { createHash, randomBytes } from 'node:crypto';
@@ -9,6 +15,12 @@ import type { SignupRequestDto } from './dto/signup-request.dto';
 export interface SignupResult {
   userId: string;
   email: string;
+}
+
+export interface VerifyEmailResult {
+  userId: string;
+  email: string;
+  alreadyVerified: boolean;
 }
 
 @Injectable()
@@ -68,6 +80,43 @@ export class AuthService {
     }
 
     return { userId: user.id, email: user.email };
+  }
+
+  async verifyEmail(token: string): Promise<VerifyEmailResult> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+
+    const verification = await this.prisma.emailVerification.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!verification || !verification.user) {
+      throw new BadRequestException('invalid-token');
+    }
+
+    if (verification.usedAt) {
+      throw new BadRequestException('token-already-used');
+    }
+
+    if (verification.expiresAt.getTime() < Date.now()) {
+      throw new GoneException('token-expired');
+    }
+
+    const alreadyVerified = verification.user.emailVerifiedAt !== null;
+    const user = verification.user;
+
+    await this.prisma.$transaction([
+      this.prisma.emailVerification.update({
+        where: { tokenHash },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: alreadyVerified ? user.emailVerifiedAt : new Date() },
+      }),
+    ]);
+
+    return { userId: user.id, email: user.email, alreadyVerified };
   }
 
   private async hashPassword(plain: string): Promise<string> {

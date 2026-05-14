@@ -18,6 +18,10 @@ export default defineConfig({
     environment: 'node',
     include: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
     exclude: ['node_modules/**', 'dist/**', '.turbo/**'],
+    fileParallelism: false,
+    sequence: {
+      concurrent: false,
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
