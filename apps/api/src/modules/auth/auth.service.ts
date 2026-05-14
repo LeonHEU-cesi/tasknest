@@ -12,7 +12,9 @@ import { hash, verify } from '@node-rs/argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../../db/prisma.service';
 import { MailService } from '../mail/mail.service';
+import type { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto';
 import type { LoginRequestDto } from './dto/login-request.dto';
+import type { ResetPasswordRequestDto } from './dto/reset-password-request.dto';
 import type { SignupRequestDto } from './dto/signup-request.dto';
 import { SessionService } from './session.service';
 
@@ -169,6 +171,65 @@ export class AuthService {
       sessionToken: session.token,
       sessionExpiresAt: session.expiresAt,
     };
+  }
+
+  async requestPasswordReset(input: ForgotPasswordRequestDto): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
+
+    if (!user || user.deletedAt || user.suspendedAt) {
+      return;
+    }
+
+    const { tokenPlain, tokenHash } = this.generateToken();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    await this.prisma.passwordReset.create({
+      data: { tokenHash, userId: user.id, expiresAt },
+    });
+
+    const webUrl = this.config.get<string>('WEB_PUBLIC_URL', 'http://localhost:3000');
+    const resetUrl = `${webUrl}/auth/reset?token=${tokenPlain}`;
+
+    try {
+      await this.mail.sendPasswordResetEmail(user.email, resetUrl);
+    } catch (error) {
+      this.logger.warn(`Password-reset email could not be sent to ${user.email}`, error);
+    }
+  }
+
+  async resetPassword(input: ResetPasswordRequestDto): Promise<{ userId: string; email: string }> {
+    const tokenHash = createHash('sha256').update(input.token).digest('hex');
+
+    const reset = await this.prisma.passwordReset.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!reset || reset.usedAt) {
+      throw new BadRequestException('invalid-token');
+    }
+
+    if (reset.expiresAt.getTime() < Date.now()) {
+      throw new GoneException('token-expired');
+    }
+
+    const newHash = await this.hashPassword(input.password);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: reset.userId },
+        data: { passwordHash: newHash, updatedAt: new Date() },
+      }),
+      this.prisma.passwordReset.update({
+        where: { tokenHash },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.session.deleteMany({ where: { userId: reset.userId } }),
+    ]);
+
+    await this.mail.sendPasswordChangedEmail(reset.user.email).catch(() => undefined);
+
+    return { userId: reset.user.id, email: reset.user.email };
   }
 
   private async hashPassword(plain: string): Promise<string> {

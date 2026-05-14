@@ -44,4 +44,43 @@ export class MailService {
       throw error;
     }
   }
+
+  async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+    const html = `
+      <p>You asked to reset your Tasknest password.</p>
+      <p>Click the link below to choose a new one:</p>
+      <p><a href="${resetUrl}">${resetUrl}</a></p>
+      <p>This link expires in 30 minutes. If you didn't ask for this, you can ignore this email.</p>
+    `.trim();
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject: 'Reset your Tasknest password',
+        html,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${to}`, error);
+      throw error;
+    }
+  }
+
+  async sendPasswordChangedEmail(to: string): Promise<void> {
+    const html = `
+      <p>Your Tasknest password has just been changed.</p>
+      <p>If this wasn't you, please contact support immediately.</p>
+    `.trim();
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject: 'Your Tasknest password was changed',
+        html,
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to send password-changed notice to ${to}`, error);
+    }
+  }
 }
