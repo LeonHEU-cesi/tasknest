@@ -1,0 +1,36 @@
+{
+  "name": "tasknest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source self-hostable task manager with native multi-provider calendar sync",
+  "license": "AGPL-3.0-only",
+  "author": "Léon Heu <leonheu97@gmail.com>",
+  "homepage": "https://github.com/LeonHEU-cesi/tasknest",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LeonHEU-cesi/tasknest.git"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:e2e": "turbo run test:e2e",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
+    "clean": "turbo run clean && rm -rf node_modules .turbo"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.0",
+    "turbo": "^2.5.0",
+    "typescript": "^5.6.0"
+  }
+}

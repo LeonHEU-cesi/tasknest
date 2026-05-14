@@ -1,0 +1,62 @@
+name: CI · Web
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "apps/web/**"
+      - "packages/types/**"
+      - "packages/ui/**"
+      - "packages/config/**"
+      - ".github/workflows/ci-web.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "turbo.json"
+  push:
+    branches: [develop, main]
+    paths:
+      - "apps/web/**"
+      - "packages/types/**"
+      - "packages/ui/**"
+      - "packages/config/**"
+
+concurrency:
+  group: ci-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Lint · Typecheck · Build · Unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NODE_ENV: test
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter @tasknest/web lint
+
+      - name: Typecheck
+        run: pnpm --filter @tasknest/web typecheck
+
+      - name: Build
+        run: pnpm --filter @tasknest/web build
+
+      - name: Unit tests
+        run: pnpm --filter @tasknest/web test:unit

@@ -1,0 +1,99 @@
+name: CI · API
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "apps/api/**"
+      - "packages/types/**"
+      - "packages/config/**"
+      - ".github/workflows/ci-api.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "turbo.json"
+  push:
+    branches: [develop, main]
+    paths:
+      - "apps/api/**"
+      - "packages/types/**"
+      - "packages/config/**"
+
+concurrency:
+  group: ci-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Lint · Typecheck · Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tasknest
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: tasknest_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tasknest -d tasknest_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://tasknest:ci_password@localhost:5432/tasknest_ci?schema=public
+      REDIS_URL: redis://localhost:6379
+      AUTH_SECRET: ci_secret_dummy_value_for_tests_only
+      TASKNEST_DB_ENCRYPTION_KEY: dGVzdGVuY3J5cHRpb25rZXkzMmJ5dGVzbG9uZ2VuY29kZWQ=
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter @tasknest/api lint
+
+      - name: Typecheck
+        run: pnpm --filter @tasknest/api typecheck
+
+      - name: Migrate DB
+        run: pnpm --filter @tasknest/api prisma:migrate:deploy
+
+      - name: Unit tests
+        run: pnpm --filter @tasknest/api test:unit
+
+      - name: Functional tests
+        run: pnpm --filter @tasknest/api test
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-api
+          path: apps/api/coverage
+          retention-days: 7

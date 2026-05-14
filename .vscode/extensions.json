@@ -1,0 +1,17 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "Prisma.prisma",
+    "ms-azuretools.vscode-docker",
+    "GitHub.vscode-pull-request-github",
+    "github.vscode-github-actions",
+    "EditorConfig.EditorConfig",
+    "mikestead.dotenv",
+    "ms-playwright.playwright",
+    "expo.vscode-expo-tools",
+    "yoavbls.pretty-ts-errors",
+    "PKief.material-icon-theme"
+  ]
+}

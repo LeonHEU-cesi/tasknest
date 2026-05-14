@@ -1,0 +1,97 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.pnp.*
+.yarn/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.turbo/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+storybook-static/
+
+# Tests / coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+.vitest-cache/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+!.env.example
+
+# Editors & IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Native mobile
+ios/Pods/
+ios/build/
+android/.gradle/
+android/build/
+android/app/build/
+*.keystore
+!debug.keystore
+*.apk
+*.aab
+*.ipa
+
+# Docker
+.docker/
+docker-data/
+
+# Prisma
+apps/api/prisma/migrations/migration_lock.toml.bak
+
+# Misc
+.cache/
+tmp/
+*.tmp
+
+# Local development data
+data/
+uploads/
+backups/
+
+# AI / agent tooling (interdit dans le repo selon méthodologie)
+.claude/
+.cursor/
+.cursorrules
+.cursorignore
+.aiderrules
+CLAUDE.md
+AGENTS.md
+COPILOT.md
+.windsurfrules
+
+# Generated files
+*.lock.bak

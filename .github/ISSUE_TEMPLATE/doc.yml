@@ -1,0 +1,29 @@
+name: Documentation
+description: Documentation improvement or addition
+title: "[docs] "
+labels: ["type-docs"]
+body:
+  - type: textarea
+    id: page
+    attributes:
+      label: Which document?
+      placeholder: "README, Plan_developpement.md, installation.md, ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: What should change?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - French (Docs/claude/Tasknest/)
+        - English (docs/, README, CONTRIBUTING)
+        - Both
+        - N/A

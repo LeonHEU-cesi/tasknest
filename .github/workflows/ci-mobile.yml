@@ -1,0 +1,57 @@
+name: CI · Mobile
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "apps/mobile/**"
+      - "packages/types/**"
+      - "packages/config/**"
+      - ".github/workflows/ci-mobile.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "turbo.json"
+  push:
+    branches: [develop, main]
+    paths:
+      - "apps/mobile/**"
+      - "packages/types/**"
+      - "packages/config/**"
+
+concurrency:
+  group: ci-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    name: Lint · Typecheck · Unit · Expo doctor
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter @tasknest/mobile lint
+
+      - name: Typecheck
+        run: pnpm --filter @tasknest/mobile typecheck
+
+      - name: Unit tests
+        run: pnpm --filter @tasknest/mobile test:unit
+
+      - name: Expo doctor
+        continue-on-error: true
+        run: pnpm --filter @tasknest/mobile exec expo-doctor

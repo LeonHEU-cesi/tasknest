@@ -1,0 +1,42 @@
+name: Test request
+description: Request adding or updating a test
+title: "[test] "
+labels: ["type-test"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to be tested?
+      placeholder: "We don't currently test ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: test-type
+    attributes:
+      label: Test type
+      options:
+        - Unit (TU)
+        - Functional API (TF)
+        - Functional Web (TF-WEB)
+        - Functional Mobile (TM)
+        - Non-regression (TNR)
+        - Security (TS)
+        - Performance (TP)
+        - Visual regression (TV)
+    validations:
+      required: true
+
+  - type: input
+    id: test-id
+    attributes:
+      label: Proposed test ID
+      placeholder: "TU-AU-02, TF-WEB-VW-05, ..."
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: When is this test considered complete?
+    validations:
+      required: true
