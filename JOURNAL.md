@@ -5,6 +5,36 @@
 
 ## Sprint 1 — Auth basique
 
+### Issue #9 — [1.3] US-AU-03 Login email + password (with cookie session)
+
+Premier mécanisme de session. Introduit la table `sessions` (Postgres) et un cookie HttpOnly transportant un token aléatoire dont seul le SHA-256 est stocké en BDD.
+
+Backend
+- **Modèle Prisma `Session`** : `id` (SHA-256 du token), `user_id`, `ip_address`, `user_agent`, `expires_at`. Index sur `user_id` et `expires_at`. Migration `add_sessions` appliquée.
+- **`SessionService`** : `create()` (génère 32 octets aléatoires base64url, calcule SHA-256 → id, expires en 7 jours), `validate()`, `destroy()`. Hash statique réutilisé par tous les consommateurs (`SessionService.hash`).
+- **`AuthService.login`** : `verify` argon2id contre `users.password_hash`. **Délai constant ≥ 1 s sur les échecs** pour limiter les attaques par chronométrage. Refus en `403 email-not-verified` si `email_verified_at` est null, `403 account-not-available` si `suspended_at` ou `deleted_at`, `401 invalid-credentials` sinon.
+- **Endpoints** ajoutés dans `AuthController` :
+  - `POST /api/v1/auth/login` retourne `{ id, email, displayName }` + pose le cookie `tasknest_session` (HttpOnly, SameSite=Lax, Secure en prod, expires 7j)
+  - `POST /api/v1/auth/logout` lit le cookie, supprime la session correspondante, vide le cookie. Réponse `204`.
+- **`main.ts`** : ajout de `cookie-parser` (middleware Nest `app.use(cookieParser())`) et de `CORS` avec `credentials: true`, origines depuis `WEB_PUBLIC_URL` + `TRUSTED_ORIGINS`.
+- Nouvelle dépendance : `cookie-parser` + types associés.
+
+Frontend
+- `apps/web/src/app/(auth)/login/page.tsx` : formulaire e-mail + mot de passe, gestion d'états, messages spécifiques pour `401` (identifiants invalides) et `403` (compte non vérifié), écran de bienvenue après succès.
+
+Tests validés
+- 5 nouveaux tests e2e (`auth.login.e2e-spec.ts`) : succès + cookie, mauvais mot de passe + délai constant, compte non vérifié → `403`, e-mail inconnu → `401`, logout supprime la session
+- Total e2e : **13 passants** (health 1 + signup 3 + verify-email 4 + login 5)
+- `pnpm --filter @tasknest/api typecheck` / `lint` (verts)
+- `pnpm --filter @tasknest/web build` (route `/login` rendue statique 1.65 kB, `/signup`, `/verify-email` toujours là)
+
+Décisions
+- **Sessions en BDD plutôt que JWT** : permet d'invalider individuellement (logout, rotation) sans dépendre d'une blacklist Redis dès le sprint 1. La bascule vers Redis pour le hot path et la révocation à la volée est planifiée au sprint 3 (US-SEC-04).
+- **Délai constant côté login** : protection minimale contre les attaques par timing — Sprint 22 (US-SEC-03) ajoutera un rate-limit Redis dédié.
+- Pas encore de guard d'authentification : aucun endpoint privé pour le moment, le guard apparaît à l'issue #11 (profile).
+
+---
+
 ### Issue #8 — [1.2] US-AU-02 Email verification
 
 Endpoint qui consomme le token envoyé à l'issue #7 pour activer le compte.

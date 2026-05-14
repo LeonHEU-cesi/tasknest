@@ -1,16 +1,20 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   GoneException,
   Injectable,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { hash } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../../db/prisma.service';
 import { MailService } from '../mail/mail.service';
+import type { LoginRequestDto } from './dto/login-request.dto';
 import type { SignupRequestDto } from './dto/signup-request.dto';
+import { SessionService } from './session.service';
 
 export interface SignupResult {
   userId: string;
@@ -23,6 +27,14 @@ export interface VerifyEmailResult {
   alreadyVerified: boolean;
 }
 
+export interface LoginResult {
+  userId: string;
+  email: string;
+  displayName: string;
+  sessionToken: string;
+  sessionExpiresAt: Date;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -32,6 +44,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly sessions: SessionService,
   ) {}
 
   async signup(input: SignupRequestDto): Promise<SignupResult> {
@@ -117,6 +130,45 @@ export class AuthService {
     ]);
 
     return { userId: user.id, email: user.email, alreadyVerified };
+  }
+
+  async login(
+    input: LoginRequestDto,
+    metadata: { ip?: string | null; userAgent?: string | null } = {},
+  ): Promise<LoginResult> {
+    const start = Date.now();
+    const minResponseMs = 1000;
+
+    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
+
+    const stored = user?.passwordHash;
+    const isValid = stored ? await verify(stored, input.password).catch(() => false) : false;
+
+    if (!user || !isValid) {
+      const elapsed = Date.now() - start;
+      if (elapsed < minResponseMs) {
+        await new Promise((resolve) => setTimeout(resolve, minResponseMs - elapsed));
+      }
+      throw new UnauthorizedException('invalid-credentials');
+    }
+
+    if (user.deletedAt || user.suspendedAt) {
+      throw new ForbiddenException('account-not-available');
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new ForbiddenException('email-not-verified');
+    }
+
+    const session = await this.sessions.create(user.id, metadata);
+
+    return {
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      sessionToken: session.token,
+      sessionExpiresAt: session.expiresAt,
+    };
   }
 
   private async hashPassword(plain: string): Promise<string> {
