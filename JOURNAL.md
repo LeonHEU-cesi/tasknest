@@ -5,6 +5,34 @@
 
 ## Sprint 1 — Auth basique
 
+### Issue #11 — [1.5] US-US-01 Profile read/edit
+
+Premier endpoint authentifié. Introduit le `SessionAuthGuard` qui transforme le cookie de session en `request.user` typé, et le décorateur `@CurrentUser()` qui injecte ce profil dans les contrôleurs.
+
+Backend
+- **`SessionAuthGuard`** (`src/common/auth/session-auth.guard.ts`) : lit le cookie `tasknest_session`, valide via `SessionService.validate`, charge le profil utilisateur (sélection minimale), refuse les comptes supprimés/suspendus. Attache `request.user` (`AuthenticatedUser`) et `request.sessionId`.
+- **`@CurrentUser()`** (`src/common/decorators/current-user.decorator.ts`) : decorator paramétré qui retourne `request.user`.
+- **`UsersService`** : `findById(id)`, `updateProfile(id, dto)`. Ne retourne jamais `password_hash` ni `is_admin` au client (`PublicProfile`).
+- **`UsersController`** : `GET /api/v1/me` (renvoie le profil complet), `PATCH /api/v1/me` (display name, locale `fr`/`en`, timezone IANA, avatar URL). `@UseGuards(SessionAuthGuard)` au niveau du controller.
+- **`UsersModule`** : importe `AuthModule` pour exposer `SessionService`. Déclare le guard comme provider.
+- `app.module.ts` : import du nouveau `UsersModule`.
+
+Frontend
+- `apps/web/src/lib/api-client.ts` enrichi : `apiGet`, `apiPatch`, gestion du `204 No Content`.
+- `apps/web/src/app/(app)/settings/page.tsx` : page `/settings` (segment `(app)` pour les pages authentifiées). Charge le profil via `GET /me`, formulaire avec display name + sélecteur de langue FR/EN + timezone IANA. Affiche un message dédié `401` (pas connecté).
+
+Tests validés
+- 5 nouveaux tests e2e (`users.profile.e2e-spec.ts`) : `401` sans cookie, `200` avec cookie valide (et pas de leak du `password_hash`), `200 PATCH` avec maj des trois champs, `400` sur locale invalide, `401 PATCH` sans cookie
+- Total e2e : **23 passants** (health 1 + signup 3 + verify 4 + login 5 + reset 5 + profile 5)
+- typecheck + lint OK
+- web build : 7 routes statiques (la nouvelle `/settings` 1.86 kB)
+
+Décision
+- `SessionAuthGuard` central plutôt qu'un guard local au controller `users` : sera réutilisé dès l'arrivée des modules `tasks`, `projects`, etc. (sprint 4 et plus).
+- `PublicProfile` filtre explicitement les champs sensibles (pas de `password_hash`, pas d'`is_admin` exposé sur l'endpoint user-facing). Pour la modération, l'admin aura ses propres endpoints au sprint 18.
+
+---
+
 ### Issue #10 — [1.4] US-AU-04 Password reset by email
 
 Flux complet « j'ai oublié mon mot de passe » : demande → email → page de réinitialisation → mise à jour du hash + invalidation de toutes les sessions de l'utilisateur.
