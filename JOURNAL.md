@@ -3,6 +3,170 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 1 — Auth basique
+
+### Issue #11 — [1.5] US-US-01 Profile read/edit
+
+Premier endpoint authentifié. Introduit le `SessionAuthGuard` qui transforme le cookie de session en `request.user` typé, et le décorateur `@CurrentUser()` qui injecte ce profil dans les contrôleurs.
+
+Backend
+- **`SessionAuthGuard`** (`src/common/auth/session-auth.guard.ts`) : lit le cookie `tasknest_session`, valide via `SessionService.validate`, charge le profil utilisateur (sélection minimale), refuse les comptes supprimés/suspendus. Attache `request.user` (`AuthenticatedUser`) et `request.sessionId`.
+- **`@CurrentUser()`** (`src/common/decorators/current-user.decorator.ts`) : decorator paramétré qui retourne `request.user`.
+- **`UsersService`** : `findById(id)`, `updateProfile(id, dto)`. Ne retourne jamais `password_hash` ni `is_admin` au client (`PublicProfile`).
+- **`UsersController`** : `GET /api/v1/me` (renvoie le profil complet), `PATCH /api/v1/me` (display name, locale `fr`/`en`, timezone IANA, avatar URL). `@UseGuards(SessionAuthGuard)` au niveau du controller.
+- **`UsersModule`** : importe `AuthModule` pour exposer `SessionService`. Déclare le guard comme provider.
+- `app.module.ts` : import du nouveau `UsersModule`.
+
+Frontend
+- `apps/web/src/lib/api-client.ts` enrichi : `apiGet`, `apiPatch`, gestion du `204 No Content`.
+- `apps/web/src/app/(app)/settings/page.tsx` : page `/settings` (segment `(app)` pour les pages authentifiées). Charge le profil via `GET /me`, formulaire avec display name + sélecteur de langue FR/EN + timezone IANA. Affiche un message dédié `401` (pas connecté).
+
+Tests validés
+- 5 nouveaux tests e2e (`users.profile.e2e-spec.ts`) : `401` sans cookie, `200` avec cookie valide (et pas de leak du `password_hash`), `200 PATCH` avec maj des trois champs, `400` sur locale invalide, `401 PATCH` sans cookie
+- Total e2e : **23 passants** (health 1 + signup 3 + verify 4 + login 5 + reset 5 + profile 5)
+- typecheck + lint OK
+- web build : 7 routes statiques (la nouvelle `/settings` 1.86 kB)
+
+Décision
+- `SessionAuthGuard` central plutôt qu'un guard local au controller `users` : sera réutilisé dès l'arrivée des modules `tasks`, `projects`, etc. (sprint 4 et plus).
+- `PublicProfile` filtre explicitement les champs sensibles (pas de `password_hash`, pas d'`is_admin` exposé sur l'endpoint user-facing). Pour la modération, l'admin aura ses propres endpoints au sprint 18.
+
+---
+
+### Issue #10 — [1.4] US-AU-04 Password reset by email
+
+Flux complet « j'ai oublié mon mot de passe » : demande → email → page de réinitialisation → mise à jour du hash + invalidation de toutes les sessions de l'utilisateur.
+
+Backend
+- **Modèle Prisma `PasswordReset`** (`token_hash`, `user_id`, `expires_at`, `used_at`). Migration `add_password_resets` appliquée.
+- **`AuthService.requestPasswordReset(email)`** : retour silencieux (`return`) si l'utilisateur n'existe pas, est suspendu ou supprimé — **aucune fuite d'information**. Sinon génère un token (32 octets, SHA-256 stocké), TTL 30 min, envoi e-mail.
+- **`AuthService.resetPassword(token, password)`** : SHA-256 le token, vérifie qu'il n'est pas déjà utilisé et pas expiré (`410 Gone`), hash argon2id le nouveau mot de passe, transaction Prisma `user.update + passwordReset.update(used_at) + sessions.deleteMany(userId)`. Envoi e-mail "password changed" en best-effort (jamais bloquant).
+- **MailService** : ajout de `sendPasswordResetEmail` et `sendPasswordChangedEmail`.
+- **Endpoints AuthController** :
+  - `POST /api/v1/auth/forgot-password` → toujours `200 { status: 'ok' }`
+  - `POST /api/v1/auth/reset-password` → `200 { id, email }`, **clearCookie** de session (sécurise même si l'utilisateur était connecté ailleurs)
+- DTOs : `ForgotPasswordRequestDto`, `ResetPasswordRequestDto` (mêmes règles complexité que signup).
+
+Frontend
+- `/auth/forgot-password` : formulaire e-mail → message neutre après succès (jamais d'aveu sur l'existence du compte)
+- `/auth/reset` : lit `?token=`, formulaire nouveau mot de passe + confirmation, gestion `410` (lien expiré). Wrappé dans `Suspense` pour le SSG Next 15.
+
+Tests validés
+- 5 nouveaux tests e2e (`auth.password-reset.e2e-spec.ts`) : 200 sans leak, 200 + token créé + mail envoyé, token inconnu → `400`, token expiré → `410`, succès complet (hash mis à jour + sessions tuées + token consommé)
+- Total e2e : **18 passants**
+- `pnpm --filter @tasknest/api` typecheck + lint OK
+- `pnpm --filter @tasknest/web build` (routes `/forgot-password` et `/reset` rendues statiques)
+
+Cas couverts
+- `TF-AU-04a` forgot inconnu → 200 silencieux
+- `TF-AU-04b` forgot connu → token créé + mail envoyé
+- `TF-AU-04c` reset token inconnu → 400
+- `TF-AU-04d` reset token expiré → 410
+- `TF-AU-04e` reset succès → hash maj, sessions tuées, token consommé
+
+Décision
+- **Invalidation de toutes les sessions** au reset password (et pas seulement la session courante) : best-practice sécurité — si un attaquant a obtenu un mot de passe leaké, il perd toute ouverture quand l'utilisateur reset.
+
+---
+
+### Issue #9 — [1.3] US-AU-03 Login email + password (with cookie session)
+
+Premier mécanisme de session. Introduit la table `sessions` (Postgres) et un cookie HttpOnly transportant un token aléatoire dont seul le SHA-256 est stocké en BDD.
+
+Backend
+- **Modèle Prisma `Session`** : `id` (SHA-256 du token), `user_id`, `ip_address`, `user_agent`, `expires_at`. Index sur `user_id` et `expires_at`. Migration `add_sessions` appliquée.
+- **`SessionService`** : `create()` (génère 32 octets aléatoires base64url, calcule SHA-256 → id, expires en 7 jours), `validate()`, `destroy()`. Hash statique réutilisé par tous les consommateurs (`SessionService.hash`).
+- **`AuthService.login`** : `verify` argon2id contre `users.password_hash`. **Délai constant ≥ 1 s sur les échecs** pour limiter les attaques par chronométrage. Refus en `403 email-not-verified` si `email_verified_at` est null, `403 account-not-available` si `suspended_at` ou `deleted_at`, `401 invalid-credentials` sinon.
+- **Endpoints** ajoutés dans `AuthController` :
+  - `POST /api/v1/auth/login` retourne `{ id, email, displayName }` + pose le cookie `tasknest_session` (HttpOnly, SameSite=Lax, Secure en prod, expires 7j)
+  - `POST /api/v1/auth/logout` lit le cookie, supprime la session correspondante, vide le cookie. Réponse `204`.
+- **`main.ts`** : ajout de `cookie-parser` (middleware Nest `app.use(cookieParser())`) et de `CORS` avec `credentials: true`, origines depuis `WEB_PUBLIC_URL` + `TRUSTED_ORIGINS`.
+- Nouvelle dépendance : `cookie-parser` + types associés.
+
+Frontend
+- `apps/web/src/app/(auth)/login/page.tsx` : formulaire e-mail + mot de passe, gestion d'états, messages spécifiques pour `401` (identifiants invalides) et `403` (compte non vérifié), écran de bienvenue après succès.
+
+Tests validés
+- 5 nouveaux tests e2e (`auth.login.e2e-spec.ts`) : succès + cookie, mauvais mot de passe + délai constant, compte non vérifié → `403`, e-mail inconnu → `401`, logout supprime la session
+- Total e2e : **13 passants** (health 1 + signup 3 + verify-email 4 + login 5)
+- `pnpm --filter @tasknest/api typecheck` / `lint` (verts)
+- `pnpm --filter @tasknest/web build` (route `/login` rendue statique 1.65 kB, `/signup`, `/verify-email` toujours là)
+
+Décisions
+- **Sessions en BDD plutôt que JWT** : permet d'invalider individuellement (logout, rotation) sans dépendre d'une blacklist Redis dès le sprint 1. La bascule vers Redis pour le hot path et la révocation à la volée est planifiée au sprint 3 (US-SEC-04).
+- **Délai constant côté login** : protection minimale contre les attaques par timing — Sprint 22 (US-SEC-03) ajoutera un rate-limit Redis dédié.
+- Pas encore de guard d'authentification : aucun endpoint privé pour le moment, le guard apparaît à l'issue #11 (profile).
+
+---
+
+### Issue #8 — [1.2] US-AU-02 Email verification
+
+Endpoint qui consomme le token envoyé à l'issue #7 pour activer le compte.
+
+- **`POST /api/v1/auth/verify-email`** lit `{ token }`, recalcule le SHA-256, retrouve la ligne `EmailVerification`, vérifie qu'elle n'est pas déjà consommée (`usedAt`) et qu'elle n'est pas expirée. Si expirée → `410 Gone`. Si invalide ou déjà utilisée → `400`. Sinon, transaction Prisma : `users.email_verified_at = now()` + `email_verifications.used_at = now()`.
+- Retourne `{ id, email, alreadyVerified }` — `alreadyVerified: true` si l'utilisateur avait déjà été validé (cas idempotent où on rejoue le token, mais on n'écrase pas la date d'origine).
+- **Vitest e2e** : 4 tests (succès nominal, token inconnu, token déjà utilisé, token expiré).
+- **`fileParallelism: false`** ajouté à `vitest.config.ts` : les tests e2e partagent la même BDD Postgres, l'exécution parallèle créait des conflits lors du `deleteMany` de `beforeEach`.
+- Frontend : page `apps/web/src/app/(auth)/verify-email/page.tsx`. Lit `?token=` via `useSearchParams`, déclenche l'appel API, affiche un message selon le résultat. **`Suspense` boundary** autour du composant interne (Next 15 exige un fallback pour `useSearchParams` lors du SSG).
+
+Tests validés
+- 8 tests e2e api passent (health + signup + verify)
+- `pnpm --filter @tasknest/api typecheck` (succès)
+- `pnpm --filter @tasknest/api lint` (0 erreur)
+- `pnpm --filter @tasknest/web build` (route `/verify-email` 1.26 kB rendue statique)
+
+Cas couverts
+- `TF-AU-02a` parcours nominal (`200`, `emailVerifiedAt` rempli, `usedAt` rempli)
+- `TF-AU-02b` token inconnu → `400`
+- `TF-AU-02c` token déjà utilisé → `400`
+- `TF-AU-02d` token expiré → `410`
+
+---
+
+### Issue #7 — [1.1] US-AU-01 Signup email + password (API + web)
+
+Première vraie fonctionnalité produit : création de compte avec hachage du mot de passe (argon2id), envoi d'un mail de confirmation et page web associée. Cette issue ajoute également l'infrastructure data + mail réutilisée par toutes les issues d'auth à venir.
+
+Backend
+- **Prisma 6 + PostgreSQL** : `apps/api/prisma/schema.prisma` pose les modèles `User` et `EmailVerification`. Migration initiale appliquée (`20260514220914_initial_users_and_email_verifications`).
+- **PrismaService global** (`apps/api/src/db/`) avec hooks `onModuleInit`/`onModuleDestroy` pour le pool de connexions.
+- **MailService** (`apps/api/src/modules/mail/`) basé sur Nodemailer 7 + Mailpit en dev (port 1025). Lit `SMTP_HOST/PORT/USER/PASSWORD/FROM` via `ConfigService`.
+- **AuthService.signup** :
+  - Validation DTO via `class-validator` (e-mail RFC 5322 ≤ 254 ; mot de passe 10–128 caractères avec au moins 1 minuscule, 1 majuscule, 1 chiffre ; displayName 1–80) ; e-mail normalisé en lowercase via `class-transformer`
+  - Hachage du mot de passe avec `@node-rs/argon2` (memoryCost ≈ 19 MiB, timeCost 2, parallelism 1)
+  - Génération d'un token de vérification : 32 octets aléatoires base64url côté plaintext, **SHA-256 en BDD** (jamais le plaintext)
+  - Tout est wrappé dans `prisma.$transaction` (user + emailVerification) pour rester atomique
+  - Envoi du mail avec lien `${WEB_PUBLIC_URL}/auth/verify-email?token=<plain>` (TTL 24 h)
+  - Si l'envoi de mail échoue, le compte est conservé mais un warning est loggé (l'utilisateur pourra demander un renvoi à l'issue #8)
+- **`POST /api/v1/auth/signup`** retourne `201 { id, email }`. Conflit e-mail existant → `409`. Validation invalide → `400` automatique via la `ValidationPipe` globale (whitelist + forbidNonWhitelisted + transform).
+- **Outils de pipeline ajoutés** : `dotenv-cli` pour que les commandes Prisma chargent le `.env` racine (`pnpm --filter @tasknest/api prisma:*`).
+- **`unplugin-swc` + `@swc/core`** dans la config Vitest pour préserver `emitDecoratorMetadata` (sans quoi NestJS échoue à injecter les dépendances dans les tests e2e).
+
+Frontend
+- `apps/web/src/lib/api-client.ts` : client `fetch` minimal (`apiPost`) avec gestion d'erreur typée (`ApiClientError`).
+- `apps/web/src/app/(auth)/signup/page.tsx` : formulaire client (e-mail, mot de passe, displayName), gestion d'états `idle / submitting / success / error`, écran de confirmation après création du compte.
+
+Tests validés
+- `pnpm --filter @tasknest/api typecheck` (succès)
+- `pnpm --filter @tasknest/api lint` (0 erreur)
+- `pnpm --filter @tasknest/api test:unit` (4 tests, dont 3 nouveaux pour `AuthService.signup`)
+- `pnpm --filter @tasknest/api test:e2e` (4 tests, dont 3 pour `POST /auth/signup` contre une vraie BDD Postgres)
+- `pnpm --filter @tasknest/api build` (compilation Nest propre)
+- `pnpm --filter @tasknest/web typecheck` / `lint` / `build` (route `/signup` rendue statique, 1.57 kB page, 103 kB shared)
+
+Cas couverts par les tests
+- `TU-AU-01` création utilisateur + appel de l'envoi de mail
+- `TF-AU-01a` parcours nominal de signup (201, utilisateur en BDD, vérification créée)
+- `TF-AU-01b` doublon e-mail rejeté en `409`
+- `TF-AU-01c` mot de passe invalide rejeté en `400`
+
+Décisions techniques
+- Argon2id retenu plutôt que bcrypt car recommandé par OWASP (memory-hard, résistant au GPU) et déjà mentionné dans `Plan_developpement.md` §5.5.
+- Pas encore de Better Auth : l'intégration NestJS exigerait un controller wildcard et un guard custom ; on n'en a pas besoin pour le signup pur. La bascule vers Better Auth est planifiée au sprint 2 quand OAuth/2FA arrivent.
+- Schéma Prisma pose dès maintenant `is_admin`, `suspended_at`, `deleted_at`, etc. — utilisé par les sprints 18 (admin) et 22 (RGPD).
+
+---
+
 ## Sprint 0 — Foundations
 
 ### Issue #1 — [0.1] Init monorepo (pnpm + Turborepo + workspaces)
