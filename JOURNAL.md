@@ -35,3 +35,28 @@ Le `docker-compose.yml` dev a été posé au commit initial (Postgres 16, Redis 
 Tests validés :
 - `docker compose -f docker-compose.yml config` valide la configuration dev (services + volumes + healthchecks)
 - `docker compose -f docker-compose.prod.yml config` valide la configuration prod (labels Traefik + dépendances saines)
+
+---
+
+### Issue #3 — [0.3] Scaffolding NestJS in apps/api with Health module
+
+Première application réelle du monorepo : un back-end NestJS 11 minimaliste, mais déjà fonctionnel de bout en bout (boot → endpoint → tests verts). Sert de patron pour les apps `web` et `mobile` (issues #4 et #5).
+
+- `apps/api/src/main.ts` : bootstrap NestJS, `ConfigModule` global, préfixe global `/api/v1`, lecture du port via `API_PORT` (défaut `4000`)
+- `apps/api/src/app.module.ts` : module racine, importe `ConfigModule` (lit `.env` et `../../.env`) et `HealthModule`
+- `apps/api/src/modules/health/health.controller.ts` : `GET /api/v1/health` renvoie `{ status: 'ok', service: '@tasknest/api', version: '...' }`
+- `apps/api/tsconfig.json` étend `tsconfig.base.json` racine (decorators + emitDecoratorMetadata) ; `tsconfig.build.json` pour la compilation prod
+- `apps/api/nest-cli.json` pour les commandes `nest start --watch` / `nest build`
+- `apps/api/eslint.config.mjs` ESLint flat config v9 + `typescript-eslint` 8
+- `apps/api/vitest.config.ts` : `include` `**/*.spec.ts` et `**/*.e2e-spec.ts`, env Node, couverture v8
+- `apps/api/src/modules/health/health.controller.spec.ts` : test unitaire du controller
+- `apps/api/test/health.e2e-spec.ts` : test e2e via `@nestjs/testing` + `supertest` (boot complet + HTTP)
+- `apps/api/package.json` mis à jour : dépendances NestJS 11 + Vitest + ESLint 9 ; scripts `dev`, `start`, `build`, `test`, `test:unit`, `test:e2e`, `lint`, `typecheck` réellement opérationnels
+
+Tests validés :
+- `pnpm install` (10.7 s, 0 conflit)
+- `pnpm --filter @tasknest/api typecheck` (succès)
+- `pnpm --filter @tasknest/api lint` (0 erreur, 0 warning)
+- `pnpm --filter @tasknest/api test:unit` (1 test, passé en 2 ms)
+- `pnpm --filter @tasknest/api test:e2e` (1 test, passé en 249 ms — `GET /api/v1/health` répond `200`)
+- `pnpm --filter @tasknest/api build` (sortie `dist/` propre)
