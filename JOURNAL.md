@@ -60,3 +60,27 @@ Tests validés :
 - `pnpm --filter @tasknest/api test:unit` (1 test, passé en 2 ms)
 - `pnpm --filter @tasknest/api test:e2e` (1 test, passé en 249 ms — `GET /api/v1/health` répond `200`)
 - `pnpm --filter @tasknest/api build` (sortie `dist/` propre)
+
+---
+
+### Issue #4 — [0.4] Scaffolding Next.js in apps/web with homepage
+
+Front-end web minimaliste reposant sur Next.js 15 (App Router) + React 19. Sprint 0 se contente d'une page d'accueil statique pour valider la pipeline build/test ; la vraie UI Tailwind + shadcn arrive à partir du sprint 7.
+
+- `apps/web/next.config.mjs` : `reactStrictMode`, `poweredByHeader: false`, `experimental.typedRoutes` activé
+- `apps/web/src/app/layout.tsx` : layout racine avec `<Metadata>` (titre, description)
+- `apps/web/src/app/page.tsx` : page d'accueil statique présentant le pitch
+- `apps/web/src/app/globals.css` : styles minimaux (color-scheme + reset léger)
+- `apps/web/tsconfig.json` étend `tsconfig.base.json` racine, ajoute le plugin Next et l'alias `@/*` vers `src/`
+- `apps/web/eslint.config.mjs` flat config ESLint 9 + `typescript-eslint` 8 (plugin Next à ajouter quand on aura les règles spécifiques utiles)
+- `apps/web/vitest.config.ts` configuration Vitest dédiée web (env Node, couverture v8)
+- `apps/web/src/lib/format.ts` + `format.spec.ts` : utilitaire `greet` + tests pour prouver que la pipeline test:unit est fonctionnelle
+- `apps/web/package.json` : dépendances Next 15 + React 19 + scripts opérationnels
+
+Tests validés :
+- `pnpm install` (9.8 s, 17 packages ajoutés, dont sharp précompilé)
+- `pnpm --filter @tasknest/web typecheck` (succès)
+- `pnpm --filter @tasknest/web lint` (0 erreur, 0 warning sur les sources)
+- `pnpm --filter @tasknest/web test:unit` (2 tests, 2 ms)
+- `pnpm --filter @tasknest/web build` (compilation réussie en 5.8 s, premier-load JS partagé à 102 kB, route `/` rendue en statique)
+- Warning Next « ESLint plugin not detected » non bloquant — sera résolu dans un sprint ultérieur via `eslint-config-next`

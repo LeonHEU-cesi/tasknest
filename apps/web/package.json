@@ -2,17 +2,34 @@
   "name": "@tasknest/web",
   "version": "0.1.0",
   "private": true,
-  "description": "Tasknest web frontend (Next.js 16 PWA) — full scaffolding in issue #4",
+  "description": "Tasknest web frontend (Next.js + PWA)",
   "scripts": {
-    "dev": "node -e \"console.log('@tasknest/web dev — pending scaffolding in issue #4')\"",
-    "start": "node -e \"console.log('@tasknest/web start — pending scaffolding in issue #4')\"",
-    "build": "node -e \"console.log('@tasknest/web build — pending scaffolding in issue #4')\"",
-    "test": "node -e \"console.log('@tasknest/web test — pending scaffolding in issue #4')\"",
-    "test:unit": "node -e \"console.log('@tasknest/web test:unit — pending scaffolding in issue #4')\"",
-    "test:e2e": "node -e \"console.log('@tasknest/web test:e2e — pending')\"",
-    "lint": "node -e \"console.log('@tasknest/web lint — pending scaffolding in issue #4')\"",
-    "lint:fix": "node -e \"console.log('@tasknest/web lint:fix — pending')\"",
-    "typecheck": "node -e \"console.log('@tasknest/web typecheck — pending scaffolding in issue #4')\"",
-    "clean": "node -e \"console.log('@tasknest/web clean')\""
+    "dev": "next dev",
+    "start": "next start",
+    "build": "next build",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:e2e": "node -e \"console.log('@tasknest/web test:e2e — Playwright lands in a later sprint')\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf .next coverage .turbo"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.1.0"
   }
 }
