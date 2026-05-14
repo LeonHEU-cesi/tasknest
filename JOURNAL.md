@@ -5,6 +5,30 @@
 
 ## Sprint 1 — Auth basique
 
+### Issue #8 — [1.2] US-AU-02 Email verification
+
+Endpoint qui consomme le token envoyé à l'issue #7 pour activer le compte.
+
+- **`POST /api/v1/auth/verify-email`** lit `{ token }`, recalcule le SHA-256, retrouve la ligne `EmailVerification`, vérifie qu'elle n'est pas déjà consommée (`usedAt`) et qu'elle n'est pas expirée. Si expirée → `410 Gone`. Si invalide ou déjà utilisée → `400`. Sinon, transaction Prisma : `users.email_verified_at = now()` + `email_verifications.used_at = now()`.
+- Retourne `{ id, email, alreadyVerified }` — `alreadyVerified: true` si l'utilisateur avait déjà été validé (cas idempotent où on rejoue le token, mais on n'écrase pas la date d'origine).
+- **Vitest e2e** : 4 tests (succès nominal, token inconnu, token déjà utilisé, token expiré).
+- **`fileParallelism: false`** ajouté à `vitest.config.ts` : les tests e2e partagent la même BDD Postgres, l'exécution parallèle créait des conflits lors du `deleteMany` de `beforeEach`.
+- Frontend : page `apps/web/src/app/(auth)/verify-email/page.tsx`. Lit `?token=` via `useSearchParams`, déclenche l'appel API, affiche un message selon le résultat. **`Suspense` boundary** autour du composant interne (Next 15 exige un fallback pour `useSearchParams` lors du SSG).
+
+Tests validés
+- 8 tests e2e api passent (health + signup + verify)
+- `pnpm --filter @tasknest/api typecheck` (succès)
+- `pnpm --filter @tasknest/api lint` (0 erreur)
+- `pnpm --filter @tasknest/web build` (route `/verify-email` 1.26 kB rendue statique)
+
+Cas couverts
+- `TF-AU-02a` parcours nominal (`200`, `emailVerifiedAt` rempli, `usedAt` rempli)
+- `TF-AU-02b` token inconnu → `400`
+- `TF-AU-02c` token déjà utilisé → `400`
+- `TF-AU-02d` token expiré → `410`
+
+---
+
 ### Issue #7 — [1.1] US-AU-01 Signup email + password (API + web)
 
 Première vraie fonctionnalité produit : création de compte avec hachage du mot de passe (argon2id), envoi d'un mail de confirmation et page web associée. Cette issue ajoute également l'infrastructure data + mail réutilisée par toutes les issues d'auth à venir.
