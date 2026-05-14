@@ -1,0 +1,23 @@
+{
+  "name": "@tasknest/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tasknest backend API (NestJS) — full scaffolding in issue #3",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "node -e \"console.log('@tasknest/api dev — pending scaffolding in issue #3')\"",
+    "start": "node -e \"console.log('@tasknest/api start — pending scaffolding in issue #3')\"",
+    "build": "node -e \"console.log('@tasknest/api build — pending scaffolding in issue #3')\"",
+    "test": "node -e \"console.log('@tasknest/api test — pending scaffolding in issue #3')\"",
+    "test:unit": "node -e \"console.log('@tasknest/api test:unit — pending scaffolding in issue #3')\"",
+    "test:e2e": "node -e \"console.log('@tasknest/api test:e2e — pending scaffolding')\"",
+    "lint": "node -e \"console.log('@tasknest/api lint — pending scaffolding in issue #3')\"",
+    "lint:fix": "node -e \"console.log('@tasknest/api lint:fix — pending')\"",
+    "typecheck": "node -e \"console.log('@tasknest/api typecheck — pending scaffolding in issue #3')\"",
+    "worker": "node -e \"console.log('@tasknest/api worker — pending')\"",
+    "prisma:migrate": "node -e \"console.log('prisma:migrate — pending scaffolding')\"",
+    "prisma:migrate:deploy": "node -e \"console.log('prisma:migrate:deploy — pending scaffolding')\"",
+    "prisma:seed": "node -e \"console.log('prisma:seed — pending scaffolding')\"",
+    "clean": "node -e \"console.log('@tasknest/api clean')\""
+  }
+}

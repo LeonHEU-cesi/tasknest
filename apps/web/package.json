@@ -1,0 +1,18 @@
+{
+  "name": "@tasknest/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tasknest web frontend (Next.js 16 PWA) — full scaffolding in issue #4",
+  "scripts": {
+    "dev": "node -e \"console.log('@tasknest/web dev — pending scaffolding in issue #4')\"",
+    "start": "node -e \"console.log('@tasknest/web start — pending scaffolding in issue #4')\"",
+    "build": "node -e \"console.log('@tasknest/web build — pending scaffolding in issue #4')\"",
+    "test": "node -e \"console.log('@tasknest/web test — pending scaffolding in issue #4')\"",
+    "test:unit": "node -e \"console.log('@tasknest/web test:unit — pending scaffolding in issue #4')\"",
+    "test:e2e": "node -e \"console.log('@tasknest/web test:e2e — pending')\"",
+    "lint": "node -e \"console.log('@tasknest/web lint — pending scaffolding in issue #4')\"",
+    "lint:fix": "node -e \"console.log('@tasknest/web lint:fix — pending')\"",
+    "typecheck": "node -e \"console.log('@tasknest/web typecheck — pending scaffolding in issue #4')\"",
+    "clean": "node -e \"console.log('@tasknest/web clean')\""
+  }
+}
