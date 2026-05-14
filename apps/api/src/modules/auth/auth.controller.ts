@@ -13,6 +13,8 @@ import { AuthService } from './auth.service';
 import { SignupRequestDto } from './dto/signup-request.dto';
 import { VerifyEmailRequestDto } from './dto/verify-email-request.dto';
 import { LoginRequestDto } from './dto/login-request.dto';
+import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto';
+import { ResetPasswordRequestDto } from './dto/reset-password-request.dto';
 import { SessionService } from './session.service';
 
 @Controller('auth')
@@ -61,6 +63,24 @@ export class AuthController {
       email: result.email,
       displayName: result.displayName,
     };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() body: ForgotPasswordRequestDto): Promise<{ status: string }> {
+    await this.authService.requestPasswordReset(body);
+    return { status: 'ok' };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body() body: ResetPasswordRequestDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ id: string; email: string }> {
+    const result = await this.authService.resetPassword(body);
+    res.clearCookie(SessionService.cookieName, this.cookieOptions(new Date(0)));
+    return { id: result.userId, email: result.email };
   }
 
   @Post('logout')

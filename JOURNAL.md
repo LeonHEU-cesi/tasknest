@@ -5,6 +5,42 @@
 
 ## Sprint 1 — Auth basique
 
+### Issue #10 — [1.4] US-AU-04 Password reset by email
+
+Flux complet « j'ai oublié mon mot de passe » : demande → email → page de réinitialisation → mise à jour du hash + invalidation de toutes les sessions de l'utilisateur.
+
+Backend
+- **Modèle Prisma `PasswordReset`** (`token_hash`, `user_id`, `expires_at`, `used_at`). Migration `add_password_resets` appliquée.
+- **`AuthService.requestPasswordReset(email)`** : retour silencieux (`return`) si l'utilisateur n'existe pas, est suspendu ou supprimé — **aucune fuite d'information**. Sinon génère un token (32 octets, SHA-256 stocké), TTL 30 min, envoi e-mail.
+- **`AuthService.resetPassword(token, password)`** : SHA-256 le token, vérifie qu'il n'est pas déjà utilisé et pas expiré (`410 Gone`), hash argon2id le nouveau mot de passe, transaction Prisma `user.update + passwordReset.update(used_at) + sessions.deleteMany(userId)`. Envoi e-mail "password changed" en best-effort (jamais bloquant).
+- **MailService** : ajout de `sendPasswordResetEmail` et `sendPasswordChangedEmail`.
+- **Endpoints AuthController** :
+  - `POST /api/v1/auth/forgot-password` → toujours `200 { status: 'ok' }`
+  - `POST /api/v1/auth/reset-password` → `200 { id, email }`, **clearCookie** de session (sécurise même si l'utilisateur était connecté ailleurs)
+- DTOs : `ForgotPasswordRequestDto`, `ResetPasswordRequestDto` (mêmes règles complexité que signup).
+
+Frontend
+- `/auth/forgot-password` : formulaire e-mail → message neutre après succès (jamais d'aveu sur l'existence du compte)
+- `/auth/reset` : lit `?token=`, formulaire nouveau mot de passe + confirmation, gestion `410` (lien expiré). Wrappé dans `Suspense` pour le SSG Next 15.
+
+Tests validés
+- 5 nouveaux tests e2e (`auth.password-reset.e2e-spec.ts`) : 200 sans leak, 200 + token créé + mail envoyé, token inconnu → `400`, token expiré → `410`, succès complet (hash mis à jour + sessions tuées + token consommé)
+- Total e2e : **18 passants**
+- `pnpm --filter @tasknest/api` typecheck + lint OK
+- `pnpm --filter @tasknest/web build` (routes `/forgot-password` et `/reset` rendues statiques)
+
+Cas couverts
+- `TF-AU-04a` forgot inconnu → 200 silencieux
+- `TF-AU-04b` forgot connu → token créé + mail envoyé
+- `TF-AU-04c` reset token inconnu → 400
+- `TF-AU-04d` reset token expiré → 410
+- `TF-AU-04e` reset succès → hash maj, sessions tuées, token consommé
+
+Décision
+- **Invalidation de toutes les sessions** au reset password (et pas seulement la session courante) : best-practice sécurité — si un attaquant a obtenu un mot de passe leaké, il perd toute ouverture quand l'utilisateur reset.
+
+---
+
 ### Issue #9 — [1.3] US-AU-03 Login email + password (with cookie session)
 
 Premier mécanisme de session. Introduit la table `sessions` (Postgres) et un cookie HttpOnly transportant un token aléatoire dont seul le SHA-256 est stocké en BDD.
