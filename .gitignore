@@ -82,6 +82,9 @@ data/
 uploads/
 backups/
 
+# Traefik runtime data (Let's Encrypt certs)
+traefik/letsencrypt/
+
 # AI / agent tooling (interdit dans le repo selon méthodologie)
 .claude/
 .cursor/
