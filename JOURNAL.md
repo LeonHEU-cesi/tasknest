@@ -3,6 +3,52 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 1 — Auth basique
+
+### Issue #7 — [1.1] US-AU-01 Signup email + password (API + web)
+
+Première vraie fonctionnalité produit : création de compte avec hachage du mot de passe (argon2id), envoi d'un mail de confirmation et page web associée. Cette issue ajoute également l'infrastructure data + mail réutilisée par toutes les issues d'auth à venir.
+
+Backend
+- **Prisma 6 + PostgreSQL** : `apps/api/prisma/schema.prisma` pose les modèles `User` et `EmailVerification`. Migration initiale appliquée (`20260514220914_initial_users_and_email_verifications`).
+- **PrismaService global** (`apps/api/src/db/`) avec hooks `onModuleInit`/`onModuleDestroy` pour le pool de connexions.
+- **MailService** (`apps/api/src/modules/mail/`) basé sur Nodemailer 7 + Mailpit en dev (port 1025). Lit `SMTP_HOST/PORT/USER/PASSWORD/FROM` via `ConfigService`.
+- **AuthService.signup** :
+  - Validation DTO via `class-validator` (e-mail RFC 5322 ≤ 254 ; mot de passe 10–128 caractères avec au moins 1 minuscule, 1 majuscule, 1 chiffre ; displayName 1–80) ; e-mail normalisé en lowercase via `class-transformer`
+  - Hachage du mot de passe avec `@node-rs/argon2` (memoryCost ≈ 19 MiB, timeCost 2, parallelism 1)
+  - Génération d'un token de vérification : 32 octets aléatoires base64url côté plaintext, **SHA-256 en BDD** (jamais le plaintext)
+  - Tout est wrappé dans `prisma.$transaction` (user + emailVerification) pour rester atomique
+  - Envoi du mail avec lien `${WEB_PUBLIC_URL}/auth/verify-email?token=<plain>` (TTL 24 h)
+  - Si l'envoi de mail échoue, le compte est conservé mais un warning est loggé (l'utilisateur pourra demander un renvoi à l'issue #8)
+- **`POST /api/v1/auth/signup`** retourne `201 { id, email }`. Conflit e-mail existant → `409`. Validation invalide → `400` automatique via la `ValidationPipe` globale (whitelist + forbidNonWhitelisted + transform).
+- **Outils de pipeline ajoutés** : `dotenv-cli` pour que les commandes Prisma chargent le `.env` racine (`pnpm --filter @tasknest/api prisma:*`).
+- **`unplugin-swc` + `@swc/core`** dans la config Vitest pour préserver `emitDecoratorMetadata` (sans quoi NestJS échoue à injecter les dépendances dans les tests e2e).
+
+Frontend
+- `apps/web/src/lib/api-client.ts` : client `fetch` minimal (`apiPost`) avec gestion d'erreur typée (`ApiClientError`).
+- `apps/web/src/app/(auth)/signup/page.tsx` : formulaire client (e-mail, mot de passe, displayName), gestion d'états `idle / submitting / success / error`, écran de confirmation après création du compte.
+
+Tests validés
+- `pnpm --filter @tasknest/api typecheck` (succès)
+- `pnpm --filter @tasknest/api lint` (0 erreur)
+- `pnpm --filter @tasknest/api test:unit` (4 tests, dont 3 nouveaux pour `AuthService.signup`)
+- `pnpm --filter @tasknest/api test:e2e` (4 tests, dont 3 pour `POST /auth/signup` contre une vraie BDD Postgres)
+- `pnpm --filter @tasknest/api build` (compilation Nest propre)
+- `pnpm --filter @tasknest/web typecheck` / `lint` / `build` (route `/signup` rendue statique, 1.57 kB page, 103 kB shared)
+
+Cas couverts par les tests
+- `TU-AU-01` création utilisateur + appel de l'envoi de mail
+- `TF-AU-01a` parcours nominal de signup (201, utilisateur en BDD, vérification créée)
+- `TF-AU-01b` doublon e-mail rejeté en `409`
+- `TF-AU-01c` mot de passe invalide rejeté en `400`
+
+Décisions techniques
+- Argon2id retenu plutôt que bcrypt car recommandé par OWASP (memory-hard, résistant au GPU) et déjà mentionné dans `Plan_developpement.md` §5.5.
+- Pas encore de Better Auth : l'intégration NestJS exigerait un controller wildcard et un guard custom ; on n'en a pas besoin pour le signup pur. La bascule vers Better Auth est planifiée au sprint 2 quand OAuth/2FA arrivent.
+- Schéma Prisma pose dès maintenant `is_admin`, `suspended_at`, `deleted_at`, etc. — utilisé par les sprints 18 (admin) et 22 (RGPD).
+
+---
+
 ## Sprint 0 — Foundations
 
 ### Issue #1 — [0.1] Init monorepo (pnpm + Turborepo + workspaces)
