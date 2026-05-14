@@ -61,7 +61,7 @@ jobs:
       TASKNEST_DB_ENCRYPTION_KEY: dGVzdGVuY3J5cHRpb25rZXkzMmJ5dGVzbG9uZ2VuY29kZWQ=
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
 
