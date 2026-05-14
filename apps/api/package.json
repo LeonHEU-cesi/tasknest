@@ -1,0 +1,50 @@
+{
+  "name": "@tasknest/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tasknest backend API (NestJS)",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "nest start --watch",
+    "start": "node dist/main",
+    "build": "nest build",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:e2e": "vitest run test",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "worker": "node -e \"console.log('@tasknest/api worker — pending later sprint')\"",
+    "prisma:migrate": "node -e \"console.log('prisma:migrate — pending Prisma scaffolding')\"",
+    "prisma:migrate:deploy": "node -e \"console.log('prisma:migrate:deploy — pending Prisma scaffolding')\"",
+    "prisma:seed": "node -e \"console.log('prisma:seed — pending Prisma scaffolding')\"",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.17.0",
+    "@types/supertest": "^6.0.2",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "rimraf": "^6.0.1",
+    "supertest": "^7.0.0",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.1.0"
+  }
+}

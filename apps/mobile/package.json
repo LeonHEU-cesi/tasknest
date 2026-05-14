@@ -1,0 +1,43 @@
+{
+  "name": "@tasknest/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tasknest mobile app (Expo SDK 53+)",
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "build": "node -e \"console.log('@tasknest/mobile build — handled by EAS build in a later sprint')\"",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:e2e": "node -e \"console.log('@tasknest/mobile test:e2e — Detox lands in a later sprint')\"",
+    "lint": "eslint \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" --fix",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf .expo coverage .turbo"
+  },
+  "dependencies": {
+    "expo": "~53.0.0",
+    "expo-constants": "~17.0.0",
+    "expo-linking": "~7.0.0",
+    "expo-router": "~5.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.80.0",
+    "react-native-safe-area-context": "5.0.0",
+    "react-native-screens": "~4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.1.0"
+  }
+}

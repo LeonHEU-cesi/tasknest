@@ -1,0 +1,12 @@
+{
+  "name": "@tasknest/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared ESLint, TypeScript and Prettier configuration",
+  "main": "./index.js",
+  "scripts": {
+    "lint": "node -e \"console.log('@tasknest/config lint — pending')\"",
+    "typecheck": "node -e \"console.log('@tasknest/config typecheck — pending')\"",
+    "clean": "node -e \"console.log('@tasknest/config clean')\""
+  }
+}

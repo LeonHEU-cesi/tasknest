@@ -1,0 +1,107 @@
+services:
+  traefik:
+    image: traefik:3-alpine
+    container_name: tasknest-traefik
+    restart: unless-stopped
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - tasknest
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: tasknest-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tasknest
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: tasknest-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - tasknest
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    image: ghcr.io/leonheu-cesi/tasknest-api:${TASKNEST_VERSION:-latest}
+    container_name: tasknest-api
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tasknest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=4000"
+
+  worker:
+    image: ghcr.io/leonheu-cesi/tasknest-api:${TASKNEST_VERSION:-latest}
+    container_name: tasknest-worker
+    restart: unless-stopped
+    command: ["pnpm", "worker"]
+    env_file:
+      - .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tasknest
+
+  web:
+    image: ghcr.io/leonheu-cesi/tasknest-web:${TASKNEST_VERSION:-latest}
+    container_name: tasknest-web
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    networks:
+      - tasknest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.web.loadbalancer.server.port=3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  tasknest:
+    name: tasknest
