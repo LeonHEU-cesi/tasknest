@@ -1,0 +1,53 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 10
+    labels:
+      - "type-chore"
+      - "scope-config"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      typescript-tooling:
+        patterns:
+          - "typescript"
+          - "@types/*"
+          - "eslint*"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+          - "typescript-eslint"
+          - "prettier"
+          - "vitest"
+          - "@vitest/*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    labels:
+      - "type-chore"
+      - "scope-ci"
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    labels:
+      - "type-chore"
+      - "scope-config"
+    commit-message:
+      prefix: "chore(docker)"
