@@ -1,0 +1,18 @@
+{
+  "name": "@tasknest/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tasknest mobile app (Expo SDK 53+) — full scaffolding in issue #5",
+  "scripts": {
+    "dev": "node -e \"console.log('@tasknest/mobile dev — pending scaffolding in issue #5')\"",
+    "start": "node -e \"console.log('@tasknest/mobile start — pending scaffolding in issue #5')\"",
+    "build": "node -e \"console.log('@tasknest/mobile build — pending scaffolding in issue #5')\"",
+    "test": "node -e \"console.log('@tasknest/mobile test — pending scaffolding in issue #5')\"",
+    "test:unit": "node -e \"console.log('@tasknest/mobile test:unit — pending scaffolding in issue #5')\"",
+    "test:e2e": "node -e \"console.log('@tasknest/mobile test:e2e — pending')\"",
+    "lint": "node -e \"console.log('@tasknest/mobile lint — pending scaffolding in issue #5')\"",
+    "lint:fix": "node -e \"console.log('@tasknest/mobile lint:fix — pending')\"",
+    "typecheck": "node -e \"console.log('@tasknest/mobile typecheck — pending scaffolding in issue #5')\"",
+    "clean": "node -e \"console.log('@tasknest/mobile clean')\""
+  }
+}
