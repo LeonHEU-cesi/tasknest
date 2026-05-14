@@ -84,3 +84,25 @@ Tests validés :
 - `pnpm --filter @tasknest/web test:unit` (2 tests, 2 ms)
 - `pnpm --filter @tasknest/web build` (compilation réussie en 5.8 s, premier-load JS partagé à 102 kB, route `/` rendue en statique)
 - Warning Next « ESLint plugin not detected » non bloquant — sera résolu dans un sprint ultérieur via `eslint-config-next`
+
+---
+
+### Issue #5 — [0.5] Scaffolding Expo in apps/mobile with login screen stub
+
+Application mobile minimaliste basée sur Expo SDK 53 + Expo Router 5 + React Native 0.80 + React 19. Sprint 0 pose juste l'écran d'accueil ; les écrans `(auth)` et `(tabs)` arrivent à partir du sprint 1.
+
+- `apps/mobile/app.json` : configuration Expo (`slug=tasknest`, scheme `tasknest`, `newArchEnabled`, plugin `expo-router`, plateformes iOS + Android, `experiments.typedRoutes`)
+- `apps/mobile/app/_layout.tsx` : `Stack` Expo Router racine (sans header) + `StatusBar` Expo
+- `apps/mobile/app/index.tsx` : écran d'accueil natif (View + Text + StyleSheet) avec le pitch produit
+- `apps/mobile/tsconfig.json` étend `tsconfig.base.json` racine, ajoute `jsx: react-jsx` + alias `@/*` vers `src/`
+- `apps/mobile/eslint.config.mjs` flat config ESLint 9 + `typescript-eslint` 8 + globals RN (`__DEV__`, etc.)
+- `apps/mobile/vitest.config.ts` env Node (les tests UI viendront avec `@testing-library/react-native` plus tard)
+- `apps/mobile/src/lib/format.ts` + `format.spec.ts` : utilitaire `greet` pour valider la pipeline test
+- `apps/mobile/package.json` : dépendances Expo 53 + `expo-router` 5 + `react-native` 0.80 + scripts opérationnels (`expo start`, `lint`, `typecheck`, `test:unit`)
+
+Tests validés :
+- `pnpm install` (17.4 s, 517 packages — un warning peer-dep `react@^19.1.0` attendu vs `19.0.0` installé, non bloquant)
+- `pnpm --filter @tasknest/mobile typecheck` (succès)
+- `pnpm --filter @tasknest/mobile lint` (0 erreur, 0 warning)
+- `pnpm --filter @tasknest/mobile test:unit` (2 tests, 2 ms)
+- Pas de `expo start` lancé : nécessite un device ou émulateur ; le workflow CI exécute `expo-doctor` en `continue-on-error` (suffisant pour valider le scaffold)
