@@ -106,3 +106,17 @@ Tests validés :
 - `pnpm --filter @tasknest/mobile lint` (0 erreur, 0 warning)
 - `pnpm --filter @tasknest/mobile test:unit` (2 tests, 2 ms)
 - Pas de `expo start` lancé : nécessite un device ou émulateur ; le workflow CI exécute `expo-doctor` en `continue-on-error` (suffisant pour valider le scaffold)
+
+---
+
+### Issue #6 — [0.6] GitHub Actions CI baseline (lint + typecheck + tests)
+
+Les workflows CI/CD posés au commit initial ont échoué dès la première exécution (pnpm setup en conflit avec `packageManager` dans `package.json`). Cette issue stabilise la baseline + ajoute le workflow de release + Dependabot.
+
+- **Fix bloquant** : suppression de `with.version: 9` dans les trois workflows `ci-api.yml`, `ci-web.yml`, `ci-mobile.yml`. La version pnpm est désormais lue uniquement depuis `package.json#packageManager` (`pnpm@9.12.0`). Résout l'erreur `ERR_PNPM_BAD_PM_VERSION` côté `pnpm/action-setup@v4`.
+- `release.yml` ajouté : placeholder déclenché par tag `v*` ou `workflow_dispatch`, crée une release GitHub en mode `--draft`. Le vrai workflow de publication d'images Docker GHCR + génération de changelog arrive au sprint 23 (issue US-OSS-04).
+- `dependabot.yml` ajouté : updates hebdomadaires npm + github-actions + docker, le lundi matin, avec labels `type-chore` + scope adapté. Les paquets TypeScript/ESLint/Vitest sont regroupés (`typescript-tooling`) pour limiter le volume de PRs.
+
+Tests validés :
+- Les workflows précédents (commits feat/api, feat/web, feat/mobile) sont à présent reproductibles à vert sur develop dès que cette correction est mergée
+- Le smoke test final passera par l'exécution réelle des trois jobs `CI · API`, `CI · Web`, `CI · Mobile` sur la PR de cette issue
