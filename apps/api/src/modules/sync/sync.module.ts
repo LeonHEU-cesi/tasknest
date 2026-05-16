@@ -6,9 +6,11 @@ import { GooglePushService } from './google-push.service';
 import { GooglePullService } from './google-pull.service';
 import { MicrosoftCalendarService } from './microsoft-calendar.service';
 import { MicrosoftPushService } from './microsoft-push.service';
+import { MicrosoftPullService } from './microsoft-pull.service';
 import { SyncController } from './sync.controller';
 import { MicrosoftSyncController } from './microsoft-sync.controller';
 import { SyncWebhookController } from './sync-webhook.controller';
+import { MicrosoftWebhookController } from './microsoft-webhook.controller';
 import { SyncQueue } from './sync-queue';
 import {
   GOOGLE_CALENDAR_TRANSPORT,
@@ -25,13 +27,19 @@ import {
 // lecture transparente. Le transport HTTP réel est injecté par défaut ;
 // l'e2e l'override par un faux en mémoire (cf. test/utils/e2e-app).
 @Module({
-  controllers: [SyncController, MicrosoftSyncController, SyncWebhookController],
+  controllers: [
+    SyncController,
+    MicrosoftSyncController,
+    SyncWebhookController,
+    MicrosoftWebhookController,
+  ],
   providers: [
     GoogleCalendarService,
     GooglePushService,
     GooglePullService,
     MicrosoftCalendarService,
     MicrosoftPushService,
+    MicrosoftPullService,
     SyncQueue,
     {
       provide: TokenCipher,
@@ -65,6 +73,7 @@ import {
     GooglePullService,
     MicrosoftCalendarService,
     MicrosoftPushService,
+    MicrosoftPullService,
   ],
 })
 export class SyncModule {}
