@@ -16,6 +16,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { ReorderTasksDto } from './dto/reorder-tasks.dto';
+import { AssignTaskDto } from './dto/assign-task.dto';
 import { TasksService } from './tasks.service';
 
 // US-TA-01..04 — Tâches : création/lecture sous la liste, édition/statut/
@@ -90,6 +91,21 @@ export class TasksController {
     @Body() dto: UpdateTaskDto,
   ) {
     return this.tasks.update(user.id, id, dto);
+  }
+
+  @Patch('tasks/:id/assignee')
+  assign(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignTaskDto,
+  ) {
+    return this.tasks.assign(user.id, id, dto.assignedTo);
+  }
+
+  @Delete('tasks/:id/assignee')
+  @HttpCode(204)
+  async unassign(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    await this.tasks.unassign(user.id, id);
   }
 
   @Post('tasks/:id/restore')

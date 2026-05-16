@@ -41,9 +41,10 @@ model User {
   sessions   Session[]
   accounts   Account[]
   twoFactors TwoFactor[]
-  projects   Project[]
-  lists      List[]
-  tasks      Task[]
+  projects      Project[]
+  lists         List[]
+  tasks         Task[]   @relation("TaskOwner")
+  assignedTasks Task[]   @relation("TaskAssignee")
 
   @@index([deletedAt])
   @@map("users")
@@ -181,6 +182,9 @@ model Task {
   listId           String    @map("list_id") @db.Uuid
   parentTaskId     String?   @map("parent_task_id") @db.Uuid
   ownerId          String    @map("owner_id") @db.Uuid
+  // US-TA-07 — assignation (prep partage : dropdown membres + notif aux
+  // sprints sharing/notif). SetNull si l'assigné est supprimé.
+  assignedTo       String?   @map("assigned_to") @db.Uuid
   title            String    @db.VarChar(240)
   description      String?
   // 'todo' | 'doing' | 'done' | 'postponed' | 'canceled'
@@ -199,11 +203,13 @@ model Task {
   children Task[] @relation("Subtasks")
   parent   Task?  @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   list     List   @relation(fields: [listId], references: [id], onDelete: Cascade)
-  owner    User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner    User   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  assignee User?  @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
 
   @@index([listId])
   @@index([ownerId, status])
   @@index([ownerId, dueAt])
   @@index([parentTaskId])
+  @@index([assignedTo])
   @@map("tasks")
 }
