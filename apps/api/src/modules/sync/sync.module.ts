@@ -3,7 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { TokenCipher } from '../../common/crypto/token-cipher';
 import { GoogleCalendarService } from './google-calendar.service';
 import { GooglePushService } from './google-push.service';
+import { GooglePullService } from './google-pull.service';
 import { SyncController } from './sync.controller';
+import { SyncWebhookController } from './sync-webhook.controller';
 import { SyncQueue } from './sync-queue';
 import {
   GOOGLE_CALENDAR_TRANSPORT,
@@ -16,10 +18,11 @@ import {
 // lecture transparente. Le transport HTTP réel est injecté par défaut ;
 // l'e2e l'override par un faux en mémoire (cf. test/utils/e2e-app).
 @Module({
-  controllers: [SyncController],
+  controllers: [SyncController, SyncWebhookController],
   providers: [
     GoogleCalendarService,
     GooglePushService,
+    GooglePullService,
     SyncQueue,
     {
       provide: TokenCipher,
@@ -37,6 +40,6 @@ import {
       inject: [ConfigService],
     },
   ],
-  exports: [GoogleCalendarService, GooglePushService],
+  exports: [GoogleCalendarService, GooglePushService, GooglePullService],
 })
 export class SyncModule {}

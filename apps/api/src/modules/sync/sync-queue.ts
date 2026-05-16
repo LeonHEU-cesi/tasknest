@@ -2,12 +2,14 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
 import { GooglePushService } from './google-push.service';
+import { GooglePullService } from './google-pull.service';
 
-// US-SY-02 — Cron BullMQ qui pousse les tâches vers Google (tous les
-// comptes connectés). Activé seulement si SYNC_WORKER=1 (prod/dev) — pas
-// en CI/e2e où le push est testé via l'endpoint déterministe, pour ne pas
-// faire tourner un worker Redis dans les tests (même politique que
-// RECURRENCE_WORKER / NOTIFICATIONS_WORKER).
+// US-SY-02/03 — Cron BullMQ : push tâches→Google puis pull Google→tâches
+// (tous les comptes connectés). Le webhook watch donne le quasi-temps réel ;
+// ce cron est le filet (corrige même si aucun webhook n'arrive). Activé
+// seulement si SYNC_WORKER=1 (prod/dev) — pas en CI/e2e où push & pull sont
+// testés via endpoints déterministes (même politique que RECURRENCE_WORKER /
+// NOTIFICATIONS_WORKER : pas de worker Redis dans les tests).
 const QUEUE = 'sync-google';
 
 @Injectable()
@@ -19,6 +21,7 @@ export class SyncQueue implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly push: GooglePushService,
+    private readonly pull: GooglePullService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -27,21 +30,23 @@ export class SyncQueue implements OnModuleInit, OnModuleDestroy {
     try {
       this.queue = new Queue(QUEUE, { connection });
       await this.queue.add(
-        'push',
+        'sync',
         {},
-        { repeat: { pattern: '*/10 * * * *' }, jobId: 'sync-google-push' },
+        { repeat: { pattern: '*/10 * * * *' }, jobId: 'sync-google' },
       );
       this.worker = new Worker(
         QUEUE,
         async () => {
-          const r = await this.push.pushAll();
+          const p = await this.push.pushAll();
+          const g = await this.pull.pullAll();
           this.logger.log(
-            `Push Google : +${r.created} ~${r.updated} -${r.deleted} =${r.skipped}`,
+            `Sync Google : push +${p.created} ~${p.updated} -${p.deleted} | ` +
+              `pull ~${g.updated} -${g.archived}`,
           );
         },
         { connection },
       );
-      this.logger.log('Worker sync Google démarré (push */10 min)');
+      this.logger.log('Worker sync Google démarré (push+pull */10 min)');
     } catch (error) {
       this.logger.error(`Démarrage worker sync impossible: ${String(error)}`);
     }

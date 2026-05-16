@@ -5,6 +5,20 @@
 
 ## Sprint 12 — Sync Google Calendar
 
+### Issue #66 — [12.3] US-SY-03 Worker pull événements Google + webhook watch
+
+Backend
+- `GooglePullService.pullAll(ownerId?)` : liste **incrémentale** via `syncToken` (delta), reprise complète sur 410 (jeton expiré), `nextSyncToken` persisté sur `CalendarAccount`.
+- Réconciliation Google→tâche : event annulé ⇒ tâche **archivée** + mapping soft-deleted ; event modifié ⇒ titre/description/échéance mis à jour, `pushedHash` réaligné pour **aucun ping-pong** push↔pull ; l'écho de nos propres push est détecté inchangé ⇒ skip.
+- **Périmètre volontaire** : seuls les events tagués `tasknestTaskId` (issus de Tasknest) sont reconciliés ; les events externes (réunions…) ne deviennent pas des tâches — documenté, hors US-SY-03.
+- Webhook `POST /integrations/google/webhook` **non authentifié** (Google n'a pas le cookie ; le `channelId` aléatoire = secret partagé), 204 rapide, ignore `state=sync` et canaux inconnus, pull best-effort du bon compte.
+- `registerWatch` (endpoint `POST .../watch`) best-effort gaté par `SYNC_WEBHOOK_URL` ; `SyncQueue` fait désormais push **puis** pull (filet si aucun webhook).
+
+Tests validés (128/128, +6)
+- `TF-SY-03` : maj Google→tâche sans aller-retour + idempotent, suppression⇒archivage+soft-delete, syncToken expiré⇒resync sans crash, webhook (handshake/ canal inconnu/ notif réelle), watch best-effort selon env, 401 sur `/pull`.
+
+---
+
 ### Issue #65 — [12.2] US-SY-02 Worker push tâches → événements Google
 
 Backend

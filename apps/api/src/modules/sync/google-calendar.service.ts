@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadGatewayException,
   ConflictException,
@@ -5,6 +6,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../db/prisma.service';
 import { TokenCipher } from '../../common/crypto/token-cipher';
 import {
@@ -35,6 +37,7 @@ export class GoogleCalendarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cipher: TokenCipher,
+    private readonly config: ConfigService,
     @Inject(GOOGLE_CALENDAR_TRANSPORT)
     private readonly transport: GoogleCalendarTransport,
   ) {}
@@ -153,5 +156,32 @@ export class GoogleCalendarService {
       where: { userId, provider: PROVIDER, disabledAt: null },
       data: { disabledAt: new Date() },
     });
+  }
+
+  // US-SY-03 — Enregistre un canal watch Google (push notifications). Le
+  // `channelId` aléatoire fait office de secret partagé pour le webhook.
+  // Best-effort : si SYNC_WEBHOOK_URL n'est pas configurée, on ne tente pas
+  // (le cron de pull garantit la correction même sans webhook).
+  async registerWatch(userId: string): Promise<{ watching: boolean }> {
+    const address = this.config.get<string>('SYNC_WEBHOOK_URL');
+    if (!address) return { watching: false };
+
+    const { accessToken, calendarId } = await this.getAccessToken(userId);
+    const calAccount = await this.prisma.calendarAccount.findFirst({
+      where: { userId, provider: PROVIDER, disabledAt: null },
+    });
+    if (!calAccount) throw new ConflictException('Google Calendar not connected');
+
+    const channelId = randomUUID();
+    const channel = await this.transport.watch(accessToken, calendarId, channelId, address);
+    await this.prisma.calendarAccount.update({
+      where: { id: calAccount.id },
+      data: {
+        watchChannelId: channel.channelId,
+        watchResourceId: channel.resourceId,
+        watchExpiresAt: channel.expiration ?? null,
+      },
+    });
+    return { watching: true };
   }
 }
