@@ -3,6 +3,46 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 6 — Tags, priorités, filtres
+
+### Issue #37-#40 — [6.3-6.6] US-TG-03/04 + US-TA-09/10 Filtres + tri
+
+Backend
+- Query params sur `GET /lists/:listId/tasks` via `FilterTasksDto` : `status`, `tagId`, `priority` (0-3), `dueBefore`/`dueAfter` (ISO), `sort` (`manual`|`due`|`priority`|`created`). Tous **combinables** (AND).
+- `sort` : `manual` = position (défaut) ; `due`/`priority`/`created` = tri dédié.
+- Validation stricte (priorité bornée, sort énuméré) → 400.
+
+Tests validés (90/90)
+- `TF-TG-03` filtre tag · `TF-TG-04` filtre priorité · `TF-TA-09` combinés (statut+priorité, fenêtre due) · `TF-TA-10` tri (priority/due) · query invalide → 400.
+
+---
+
+### Issue #36 — [6.2] US-TG-02 Assignation tags ↔ tâche (M2M)
+
+Backend
+- Modèle join `TaskTag` (`@@id([taskId,tagId])`, cascade des deux côtés). Migration `task_tags`.
+- `PUT /tasks/:id/tags { tagIds }` : remplace l'ensemble (idempotent, transaction) ; tous les tagIds doivent appartenir au owner (sinon 404).
+- Lectures de tâches : tags exposés à plat (`tags: Tag[]`).
+
+Tests validés (85/85)
+- `TF-TG-02` : set/replace/clear ; tags inclus dans la liste ; tag d'un autre → 404.
+
+---
+
+### Issue #35 — [6.1] US-TG-01 CRUD tags
+
+`TagsModule` : tags par utilisateur (nom + couleur).
+
+Backend
+- Modèle `Tag` (ownerId, name, color), `@@unique([ownerId, name])`. Migration `tags`.
+- CRUD owner-scoped ; conflit de nom (P2002) → **409** ; même nom autorisé pour deux users distincts.
+
+Tests validés (82/82)
+- `TF-TG-01` : create→list→update→delete ; doublon nom → 409 ; même nom OK pour 2 users.
+- `TS` : tag d'un autre → 404 ; 401 sans session.
+
+---
+
 ## Sprint 5 — Tasks hierarchy
 
 ### Issue #34 — [5.7] US-TA-08 Recherche full-text (pg_trgm)

@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../db/prisma.service';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
+import type { FilterTasksDto } from './dto/filter-tasks.dto';
 
 // US-TA-01..04 — Tâches scopées au propriétaire ; chaque opération vérifie
 // la possession de la liste / de la tâche.
@@ -37,18 +38,57 @@ export class TasksService {
     });
   }
 
-  async findAllForList(ownerId: string, listId: string) {
+  // US-TG-02 — Tags exposés à plat (`tags: Tag[]`) dans les lectures.
+  private static readonly TAG_INCLUDE = { taskTags: { include: { tag: true } } } as const;
+
+  private withTags<T extends { taskTags?: { tag: unknown }[] }>(task: T) {
+    const { taskTags, ...rest } = task;
+    return { ...rest, tags: (taskTags ?? []).map((tt) => tt.tag) };
+  }
+
+  // US-TA-09/10, US-TG-03/04 — Filtres combinables (statut, tag, priorité,
+  // fenêtre due_at) + tri configurable.
+  async findAllForList(ownerId: string, listId: string, filter: FilterTasksDto = {}) {
     await this.assertList(ownerId, listId);
-    return this.prisma.task.findMany({
-      where: { listId, ownerId, archivedAt: null },
-      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+
+    const due: Prisma.DateTimeNullableFilter = {};
+    if (filter.dueAfter) due.gte = new Date(filter.dueAfter);
+    if (filter.dueBefore) due.lte = new Date(filter.dueBefore);
+
+    const where: Prisma.TaskWhereInput = {
+      listId,
+      ownerId,
+      archivedAt: null,
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.priority !== undefined ? { priority: filter.priority } : {}),
+      ...(filter.tagId ? { taskTags: { some: { tagId: filter.tagId } } } : {}),
+      ...(due.gte || due.lte ? { dueAt: due } : {}),
+    };
+
+    const orderBy: Prisma.TaskOrderByWithRelationInput[] =
+      filter.sort === 'due'
+        ? [{ dueAt: 'asc' }]
+        : filter.sort === 'priority'
+          ? [{ priority: 'asc' }]
+          : filter.sort === 'created'
+            ? [{ createdAt: 'desc' }]
+            : [{ position: 'asc' }, { createdAt: 'asc' }];
+
+    const tasks = await this.prisma.task.findMany({
+      where,
+      orderBy,
+      include: TasksService.TAG_INCLUDE,
     });
+    return tasks.map((task) => this.withTags(task));
   }
 
   async findOne(ownerId: string, id: string) {
-    const task = await this.prisma.task.findFirst({ where: { id, ownerId } });
+    const task = await this.prisma.task.findFirst({
+      where: { id, ownerId },
+      include: TasksService.TAG_INCLUDE,
+    });
     if (!task) throw new NotFoundException('task-not-found');
-    return task;
+    return this.withTags(task);
   }
 
   // US-TA-08 — Recherche full-text sur title/description (ILIKE accéléré
@@ -245,6 +285,26 @@ export class TasksService {
   async unassign(ownerId: string, id: string) {
     await this.findOne(ownerId, id);
     return this.prisma.task.update({ where: { id }, data: { assignedTo: null } });
+  }
+
+  // US-TG-02 — Remplace l'ensemble des tags d'une tâche (idempotent).
+  // Tous les tagIds doivent appartenir au propriétaire.
+  async setTags(ownerId: string, taskId: string, tagIds: string[]) {
+    await this.findOne(ownerId, taskId);
+    const uniqueIds = [...new Set(tagIds)];
+    if (uniqueIds.length > 0) {
+      const owned = await this.prisma.tag.count({
+        where: { id: { in: uniqueIds }, ownerId },
+      });
+      if (owned !== uniqueIds.length) throw new NotFoundException('tag-not-found');
+    }
+    await this.prisma.$transaction([
+      this.prisma.taskTag.deleteMany({ where: { taskId } }),
+      this.prisma.taskTag.createMany({
+        data: uniqueIds.map((tagId) => ({ taskId, tagId })),
+      }),
+    ]);
+    return this.findOne(ownerId, taskId);
   }
 
   // US-TA-04 — Soft-delete (archive) + restauration tant que non purgée.
