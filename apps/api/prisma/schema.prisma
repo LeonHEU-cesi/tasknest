@@ -30,11 +30,15 @@ model User {
   suspendedAt DateTime? @map("suspended_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  // US-SEC-01 — 2FA TOTP (géré par le plugin Better Auth two-factor).
+  twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  sessions Session[]
-  accounts Account[]
+  sessions   Session[]
+  accounts   Account[]
+  twoFactors TwoFactor[]
 
   @@index([deletedAt])
   @@map("users")
@@ -101,4 +105,22 @@ model Verification {
 
   @@index([identifier])
   @@map("verifications")
+}
+
+// US-SEC-01 — Secret TOTP + codes de récupération (1 par utilisateur,
+// schéma attendu par le plugin Better Auth two-factor). `secret` et
+// `backupCodes` sont gérés/chiffrés par le plugin.
+model TwoFactor {
+  id          String  @id @default(uuid()) @db.Uuid
+  secret      String
+  backupCodes String  @map("backup_codes")
+  userId      String  @map("user_id") @db.Uuid
+  // Géré par le plugin : false tant que le 1er code TOTP n'a pas confirmé.
+  verified    Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([secret])
+  @@index([userId])
+  @@map("two_factors")
 }

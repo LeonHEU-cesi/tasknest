@@ -5,6 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 // NestJS est compilée en CommonJS — voir createBetterAuth ci-dessous).
 import type { betterAuth as BetterAuthFactory } from 'better-auth';
 
+import Redis from 'ioredis';
 import { TokenCipher } from '../common/crypto/token-cipher';
 
 // US-AU-01..07 — Instance Better Auth, système d'auth complet de Tasknest.
@@ -19,6 +20,7 @@ export interface BetterAuthDeps {
   // et la même mise en forme que le Sprint 1).
   sendVerificationEmail: (to: string, url: string) => Promise<void>;
   sendResetPasswordEmail: (to: string, url: string) => Promise<void>;
+  sendMagicLinkEmail: (to: string, url: string) => Promise<void>;
 }
 
 // Paramètres argon2id alignés sur la décision verrouillée Sprint 1
@@ -57,6 +59,10 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
     betterAuth: typeof BetterAuthFactory;
   };
   const { prismaAdapter } = await import('better-auth/adapters/prisma');
+  // US-AU-08 — plugin magic link (ESM-only ⇒ import dynamique comme le reste).
+  const { magicLink } = await import('better-auth/plugins/magic-link');
+  // US-SEC-01/02 — plugin 2FA TOTP + codes de récupération.
+  const { twoFactor } = await import('better-auth/plugins/two-factor');
 
   const secret = env('AUTH_SECRET');
   if (!secret) {
@@ -71,12 +77,29 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
   // côté consommateurs (sync agenda), jamais en lecture transparente.
   const cipher = await TokenCipher.create(env('TASKNEST_DB_ENCRYPTION_KEY'));
 
+  // US-SEC-04 / #20 — Redis en secondary storage : chemin chaud des
+  // sessions servi par Redis (la BDD reste la source de vérité). Permet
+  // l'invalidation immédiate (revoke) sans attendre l'expiration.
+  const redis = new Redis(env('REDIS_URL') ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  });
+
   return betterAuth({
     secret,
     baseURL: apiBaseUrl,
     basePath: '/api/v1/auth',
     trustedOrigins: [webBaseUrl],
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
+    secondaryStorage: {
+      get: (key) => redis.get(key),
+      set: async (key, value, ttl) => {
+        if (ttl) await redis.set(key, value, 'EX', ttl);
+        else await redis.set(key, value);
+      },
+      delete: async (key) => {
+        await redis.del(key);
+      },
+    },
 
     emailAndPassword: {
       enabled: true,
@@ -165,5 +188,24 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
         },
       },
     },
+
+    // US-AU-08 — connexion sans mot de passe par lien e-mail. Token usage
+    // unique, TTL 15 min. Better Auth crée la session (et enchaîne le
+    // challenge 2FA si actif, US-SEC-02).
+    plugins: [
+      magicLink({
+        expiresIn: 60 * 15,
+        sendMagicLink: async ({ email, url }) => {
+          await deps.sendMagicLinkEmail(email, url);
+        },
+      }),
+      // US-SEC-01 : activation TOTP (QR via totpURI) + 10 codes de
+      // récupération. US-SEC-02 : le challenge au login est géré par le
+      // plugin (sign-in renvoie un twoFactorRedirect si 2FA actif).
+      twoFactor({
+        issuer: 'Tasknest',
+        backupCodeOptions: { amount: 10 },
+      }),
+    ],
   });
 }

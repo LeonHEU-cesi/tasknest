@@ -66,6 +66,26 @@ export class MailService {
     }
   }
 
+  async sendMagicLinkEmail(to: string, magicUrl: string): Promise<void> {
+    const html = `
+      <p>Here is your Tasknest sign-in link:</p>
+      <p><a href="${magicUrl}">${magicUrl}</a></p>
+      <p>This link expires in 15 minutes and can be used only once. If you didn't request it, ignore this email.</p>
+    `.trim();
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject: 'Your Tasknest sign-in link',
+        html,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send magic link email to ${to}`, error);
+      throw error;
+    }
+  }
+
   async sendPasswordChangedEmail(to: string): Promise<void> {
     const html = `
       <p>Your Tasknest password has just been changed.</p>

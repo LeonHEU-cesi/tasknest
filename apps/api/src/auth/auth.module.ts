@@ -33,6 +33,7 @@ export { BETTER_AUTH };
           env: (key) => config.get<string>(key),
           sendVerificationEmail: (to, url) => mail.sendVerificationEmail(to, url),
           sendResetPasswordEmail: (to, url) => mail.sendPasswordResetEmail(to, url),
+          sendMagicLinkEmail: (to, url) => mail.sendMagicLinkEmail(to, url),
         }),
     },
     AuthGuard,
