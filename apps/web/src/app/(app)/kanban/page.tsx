@@ -4,8 +4,11 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   DndContext,
+  PointerSensor,
   useDraggable,
   useDroppable,
+  useSensor,
+  useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { apiGet, apiPatch } from '@/lib/api-client';
@@ -55,6 +58,8 @@ function KanbanBoard() {
     await apiPatch(`/tasks/${taskId}`, { status: target });
   };
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
   const persistColumns = async (next: TaskStatus[]) => {
     setColumns(next);
     await apiPatch(`/lists/${listId}`, { kanbanColumns: next });
@@ -79,7 +84,7 @@ function KanbanBoard() {
         <ColumnEditor columns={columns} onChange={persistColumns} />
       ) : null}
 
-      <DndContext onDragEnd={onDragEnd}>
+      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex flex-1 gap-4 overflow-x-auto">
           {columns.map((status) => (
             <Column

@@ -3,6 +3,21 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 8 — Vue Calendar
+
+### Issue #46 — [8.1] US-VW-05 Vue Calendrier (mois/semaine/jour)
+
+Web (API tasks/dueAt déjà prête, aucun changement back)
+- Page `/calendar` : grilles **mois / semaine / jour** (`date-fns`), navigation prev/today/next, tâches positionnées par `dueAt`.
+- **Drag** d'une tâche sur un jour ⇒ `PATCH /tasks/:id {dueAt}` (optimiste) ; **clic** ⇒ panneau détail.
+- `PointerSensor` avec contrainte de distance (6px) : un clic n'amorce pas de drag (sinon `onClick` avalé par dnd-kit) — corrigé aussi sur le Kanban.
+- Lien Calendar dans la sidebar.
+
+Tests validés
+- Playwright **3/3** (TF-WEB-VW-05 : grille mois, tâche dans sa cellule, détail au clic, bascule semaine/jour ; + non-régression List/Kanban). web typecheck/lint/build verts.
+
+---
+
 ## Sprint 7 — Vue List + Kanban
 
 ### Issue #45 — [7.5] TF-WEB-VW-* Playwright (List + Kanban)
