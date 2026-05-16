@@ -3,26 +3,27 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiClientError, apiGet, apiPatch } from '@/lib/api-client';
 
+// US-US-01 — Profil aligné sur le schéma Better Auth (name/image/emailVerified).
 interface Profile {
   id: string;
   email: string;
-  displayName: string;
+  name: string;
   locale: 'fr' | 'en';
   timezone: string;
-  avatarUrl: string | null;
-  emailVerifiedAt: string | null;
+  image: string | null;
+  emailVerified: boolean;
 }
 
 interface UpdateBody {
-  displayName?: string;
+  name?: string;
   locale?: 'fr' | 'en';
   timezone?: string;
-  avatarUrl?: string;
+  image?: string;
 }
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [displayName, setDisplayName] = useState('');
+  const [name, setName] = useState('');
   const [locale, setLocale] = useState<'fr' | 'en'>('fr');
   const [timezone, setTimezone] = useState('Europe/Paris');
   const [status, setStatus] = useState<'loading' | 'idle' | 'saving' | 'saved' | 'error'>(
@@ -36,7 +37,7 @@ export default function SettingsPage() {
       .then((data) => {
         if (cancelled) return;
         setProfile(data);
-        setDisplayName(data.displayName);
+        setName(data.name);
         setLocale(data.locale);
         setTimezone(data.timezone);
         setStatus('idle');
@@ -61,11 +62,7 @@ export default function SettingsPage() {
     setErrorMessage(null);
 
     try {
-      const updated = await apiPatch<UpdateBody, Profile>('/me', {
-        displayName,
-        locale,
-        timezone,
-      });
+      const updated = await apiPatch<UpdateBody, Profile>('/me', { name, locale, timezone });
       setProfile(updated);
       setStatus('saved');
     } catch (error) {
@@ -102,8 +99,8 @@ export default function SettingsPage() {
           Display name
           <input
             type="text"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             required
             maxLength={80}
             style={inputStyle}

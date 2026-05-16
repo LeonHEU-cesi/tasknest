@@ -1,55 +1,49 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { ApiClientError, apiPost } from '@/lib/api-client';
+import { signIn } from '@/lib/auth-client';
 
-interface LoginResponse {
-  id: string;
-  email: string;
-  displayName: string;
-}
-
-interface LoginBody {
-  email: string;
-  password: string;
-}
-
+// US-AU-03 / US-AU-05 — Connexion e-mail/mot de passe + « Continue with
+// Google » (OAuth 2.0). La session est posée par Better Auth (cookie).
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [welcome, setWelcome] = useState<LoginResponse | null>(null);
+
+  const callbackURL =
+    typeof window !== 'undefined' ? `${window.location.origin}/settings` : '/settings';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus('submitting');
     setErrorMessage(null);
 
-    try {
-      const response = await apiPost<LoginBody, LoginResponse>('/auth/login', { email, password });
-      setWelcome(response);
-      setStatus('success');
-    } catch (error) {
-      setStatus('error');
-      if (error instanceof ApiClientError && error.status === 403) {
+    const { error } = await signIn.email({ email, password });
+    if (error) {
+      setStatus('idle');
+      if (error.status === 403) {
         setErrorMessage('Please confirm your email before signing in.');
-      } else if (error instanceof ApiClientError && error.status === 401) {
+      } else if (error.status === 401) {
         setErrorMessage('Invalid email or password.');
       } else {
-        setErrorMessage('Unexpected error, please retry.');
+        setErrorMessage(error.message ?? 'Unexpected error, please retry.');
       }
+      return;
     }
+    setStatus('success');
   };
 
-  if (status === 'success' && welcome) {
+  const handleGoogle = async () => {
+    setErrorMessage(null);
+    await signIn.social({ provider: 'google', callbackURL });
+  };
+
+  if (status === 'success') {
     return (
       <main style={pageStyle}>
-        <h1>Welcome back, {welcome.displayName}!</h1>
-        <p>
-          You are signed in as <strong>{welcome.email}</strong>. The dashboard arrives in upcoming
-          sprints.
-        </p>
+        <h1>You&apos;re signed in</h1>
+        <p>The dashboard arrives in upcoming sprints.</p>
       </main>
     );
   }
@@ -57,6 +51,12 @@ export default function LoginPage() {
   return (
     <main style={pageStyle}>
       <h1>Sign in to Tasknest</h1>
+
+      <button type="button" onClick={handleGoogle} style={buttonStyle}>
+        Continue with Google
+      </button>
+
+      <p style={{ textAlign: 'center', opacity: 0.6, margin: '1rem 0' }}>or</p>
 
       <form onSubmit={handleSubmit} noValidate style={formStyle}>
         <label style={labelStyle}>
@@ -108,7 +108,6 @@ const formStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
-  marginTop: '1.5rem',
 } as const;
 
 const labelStyle = {
@@ -136,6 +135,7 @@ const buttonStyle = {
   cursor: 'pointer',
   fontSize: '1rem',
   fontWeight: 600,
+  width: '100%',
 } as const;
 
 const errorStyle = {
