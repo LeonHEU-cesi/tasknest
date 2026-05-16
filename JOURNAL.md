@@ -5,6 +5,22 @@
 
 ## Sprint 3 — Auth 2FA + magic link
 
+### Issue #20 — [3.4] Sessions Redis + invalidation manuelle
+
+Chemin chaud des sessions servi par Redis (la BDD reste source de vérité), invalidation immédiate.
+
+Backend
+- `ioredis` ; client créé depuis `REDIS_URL` dans `createBetterAuth`.
+- Option `secondaryStorage` Better Auth (`get`/`set` avec TTL/`delete`) branchée sur Redis : lecture de session via Redis, révocation effective sans attendre l'expiration.
+- Invalidation manuelle via endpoints natifs Better Auth : `sign-out`, `revoke-sessions`.
+
+Tests validés (47/47)
+- Session servie : après login, `/me` 200 et Redis peuplé (`dbsize > 0`).
+- `sign-out` ⇒ `/me` 401 immédiat ; `revoke-sessions` ⇒ `/me` 401.
+- Setup e2e : `REDIS_URL` forcé sur `localhost` (le `.env` pointe le hostname docker `redis:6379`, injoignable depuis l'hôte/CI).
+
+---
+
 ### Issue #19 — [3.3] US-SEC-02 2FA obligatoire au login + challenge
 
 Enforcement du challenge 2FA après l'étape 1, géré nativement par le plugin Better Auth `two-factor`.

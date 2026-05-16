@@ -5,6 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 // NestJS est compilée en CommonJS — voir createBetterAuth ci-dessous).
 import type { betterAuth as BetterAuthFactory } from 'better-auth';
 
+import Redis from 'ioredis';
 import { TokenCipher } from '../common/crypto/token-cipher';
 
 // US-AU-01..07 — Instance Better Auth, système d'auth complet de Tasknest.
@@ -76,12 +77,29 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
   // côté consommateurs (sync agenda), jamais en lecture transparente.
   const cipher = await TokenCipher.create(env('TASKNEST_DB_ENCRYPTION_KEY'));
 
+  // US-SEC-04 / #20 — Redis en secondary storage : chemin chaud des
+  // sessions servi par Redis (la BDD reste la source de vérité). Permet
+  // l'invalidation immédiate (revoke) sans attendre l'expiration.
+  const redis = new Redis(env('REDIS_URL') ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  });
+
   return betterAuth({
     secret,
     baseURL: apiBaseUrl,
     basePath: '/api/v1/auth',
     trustedOrigins: [webBaseUrl],
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
+    secondaryStorage: {
+      get: (key) => redis.get(key),
+      set: async (key, value, ttl) => {
+        if (ttl) await redis.set(key, value, 'EX', ttl);
+        else await redis.set(key, value);
+      },
+      delete: async (key) => {
+        await redis.del(key);
+      },
+    },
 
     emailAndPassword: {
       enabled: true,
