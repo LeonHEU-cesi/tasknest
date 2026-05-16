@@ -5,6 +5,16 @@
 
 ## Sprint 14 — Sync Apple CalDAV
 
+### Issue #74 — [14.3] US-SY-09 Worker push/pull CalDAV générique
+
+- Le **repli ETag** (PROPFIND depth:1 + diff quand REPORT `sync-collection` est indisponible) est porté par `CaldavPullService` (livré #73). #74 = validation des serveurs sans sync-collection (Samsung / Radicale / Nextcloud anciens) : nouveau ⇒ ETag absent du mapping, modifié ⇒ ETag différent, supprimé ⇒ href disparu du listing.
+- `detectCaldavKind` couvre icloud/nextcloud/samsung, Radicale & co. ⇒ `generic`.
+
+Tests validés (174/174, +2)
+- `TF-SY-09` (`syncCollectionUnsupported=true`) : push OK, pull baseline sans faux positif (ETag mappé), édition serveur détectée par diff ETag, **pas de ping-pong**, suppression ⇒ archivage. `TS-SY-09` : `detectCaldavKind` (icloud/nextcloud/samsung/generic + URL invalide).
+
+---
+
 ### Issue #73 — [14.2] US-SY-08 Worker push/pull CalDAV iCloud
 
 - `caldav-ical.mapper.ts` : sérialiseur/parseur **iCalendar minimal** (RFC 5545 — échappement, dépliage des lignes, UID stable `tasknest-<id>@tasknest` + `X-TASKNEST-TASK-ID`), pas de dépendance lourde. Réexporte `taskPushHash`/`isSyncEligible`.
