@@ -28,5 +28,6 @@ export class CreateTaskDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(9999)
   estimatedMinutes?: number;
 }

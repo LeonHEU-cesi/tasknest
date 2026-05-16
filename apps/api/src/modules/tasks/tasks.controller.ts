@@ -15,6 +15,7 @@ import type { AuthenticatedUser } from '../../auth/auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { ReorderTasksDto } from './dto/reorder-tasks.dto';
 import { TasksService } from './tasks.service';
 
 // US-TA-01..04 — Tâches : création/lecture sous la liste, édition/statut/
@@ -48,6 +49,23 @@ export class TasksController {
     @Param('listId', ParseUUIDPipe) listId: string,
   ) {
     return this.tasks.findAllForList(user.id, listId);
+  }
+
+  @Get('lists/:listId/tasks/summary')
+  summary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('listId', ParseUUIDPipe) listId: string,
+  ) {
+    return this.tasks.summaryForList(user.id, listId);
+  }
+
+  @Patch('lists/:listId/tasks/reorder')
+  reorder(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('listId', ParseUUIDPipe) listId: string,
+    @Body() dto: ReorderTasksDto,
+  ) {
+    return this.tasks.reorder(user.id, listId, dto.orderedIds);
   }
 
   @Get('tasks/:id')
