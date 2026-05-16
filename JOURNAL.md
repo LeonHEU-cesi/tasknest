@@ -3,6 +3,24 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 9 — Vue Timeline / Gantt
+
+### Issue #50/#51/#52 — [9.1/9.2/9.3] US-VW-07/08 Timeline + édition + visual reg
+
+Web (aucun changement back ; `date-fns`)
+- Page `/timeline` : axe de dates, tâches planifiées en **barres** (`startAt`→`dueAt`), **zoom** jour/semaine/mois/trimestre (px/jour adaptés), tâches sans dates exclues, bandeau « dépendances : à venir » (US-VW-07).
+- **Édition (US-VW-08)** : déplacer (◀▶ décale start+due) et **redimensionner** (⇤ start / ⇥ due, un seul bord) ⇒ `PATCH` ciblé. Affordances boutons accessibles (testables + a11y) ; drag souris en complément UX.
+- Lien sidebar Timeline.
+
+Tests validés (#52)
+- Playwright **6/6** : TF-WEB-VW-07 (barres/zoom/flag, tâche sans dates absente) + TF-WEB-VW-08 (move ⇒ PATCH start+due ; resize-due ⇒ PATCH **dueAt seul**) + non-régression List/Kanban/Calendar.
+- Visual regression : assertions **structurelles déterministes** (cross-plateforme) ; le **pixel-snapshot Chromatic** nécessite un token/compte externe (à fournir par Léon) — l'infra Playwright `toHaveScreenshot` est prête à l'activer.
+
+Périmètre
+- **#53 (Timeline mobile read-only) reporté** hors M9 — app mobile sans foundation (dépend #154).
+
+---
+
 ## Sprint 8 — Vue Calendar
 
 ### Issue #47/#49 — [8.2/8.4] US-VW-06 Création depuis créneau + Playwright
