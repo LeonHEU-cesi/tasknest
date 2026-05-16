@@ -5,6 +5,24 @@
 
 ## Sprint 4 — Tasks core
 
+### Issue #23-#27 — [4.3-4.7] US-TA-01..04 Tâches core + baseline tests
+
+`TasksModule` couvrant création, édition, transitions de statut, archivage/restauration, + baseline de tests (#27).
+
+Backend
+- `POST/GET /lists/:listId/tasks`, `GET/PATCH/DELETE /tasks/:id`, `POST /tasks/:id/restore`.
+- US-TA-01 : `title` requis, `position` auto en fin de liste (`aggregate _max`).
+- US-TA-02 : édition partielle (title/description/priority/dates/estimate/position).
+- US-TA-03 : `status` ∈ {todo,doing,done,postponed,canceled} ; `done` → `completedAt=now`, en sortir → `completedAt=null`.
+- US-TA-04 : soft-delete `archivedAt` + `restore` tant que non purgée.
+- Owner-scoped, vérif possession liste/tâche.
+
+Tests validés (61/61, 15 fichiers — #27 baseline)
+- `TF-TA-01..04` : create+position, édition, statut/completedAt, archive/restore ; statut invalide → 400.
+- `TS` : tâche d'un autre → 404 ; 401 sans session. Non-régression projects/lists/auth verte.
+
+---
+
 ### Issue #22 — [4.2] US-LI-01 CRUD listes dans un projet
 
 `ListsModule` : listes imbriquées sous le projet.
