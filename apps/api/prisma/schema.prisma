@@ -37,6 +37,11 @@ model User {
   twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
   // US-ST-03 — auto-complétion du parent quand toutes les sous-tâches done.
   autoCompleteSubtasks Boolean @default(true) @map("auto_complete_subtasks")
+  // US-NO-06 / US-US-03 — préférences notifications (canaux + types).
+  notifyReminders Boolean @default(true) @map("notify_reminders")
+  notifyDigest    Boolean @default(true) @map("notify_digest")
+  notifyWebPush   Boolean @default(true) @map("notify_web_push")
+  notifyEmail     Boolean @default(true) @map("notify_email")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -48,8 +53,10 @@ model User {
   lists         List[]
   tasks           Task[]           @relation("TaskOwner")
   assignedTasks   Task[]           @relation("TaskAssignee")
-  tags            Tag[]
-  recurrenceRules RecurrenceRule[]
+  tags              Tag[]
+  recurrenceRules   RecurrenceRule[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
 
   @@index([deletedAt])
   @@map("users")
@@ -221,6 +228,7 @@ model Task {
   assignee       User?           @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
   taskTags       TaskTag[]
   recurrenceRule RecurrenceRule? @relation(fields: [recurrenceRuleId], references: [id], onDelete: SetNull)
+  notifications  Notification[]
 
   @@unique([recurrenceRuleId, occurrenceDate])
   @@index([listId])
@@ -278,4 +286,44 @@ model RecurrenceRule {
 
   @@index([ownerId])
   @@map("recurrence_rules")
+}
+
+// US-NO-* — Notification (in-app + canaux). payload = contenu sérialisé.
+model Notification {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  taskId       String?   @map("task_id") @db.Uuid
+  // 'reminder' | 'recurring_due' | 'share_invite' | 'comment' | 'digest' | …
+  type         String    @db.VarChar(32)
+  // 'web_push' | 'expo_push' | 'email' | 'in_app'
+  channel      String    @db.VarChar(16)
+  payload      Json
+  scheduledFor DateTime  @map("scheduled_for")
+  sentAt       DateTime? @map("sent_at")
+  readAt       DateTime? @map("read_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  // Idempotence des rappels : un seul (task, type, scheduledFor) par tâche.
+  @@unique([taskId, type, scheduledFor])
+  @@index([userId, readAt])
+  @@index([scheduledFor, sentAt])
+  @@map("notifications")
+}
+
+// US-NO-01 — Abonnement Web Push (VAPID).
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String    @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
