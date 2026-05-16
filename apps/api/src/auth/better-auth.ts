@@ -163,6 +163,12 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
         isAdmin: { type: 'boolean', required: false, defaultValue: false, input: false },
         suspendedAt: { type: 'date', required: false, input: false },
         deletedAt: { type: 'date', required: false, input: false },
+        autoCompleteSubtasks: {
+          type: 'boolean',
+          required: false,
+          defaultValue: true,
+          input: false,
+        },
       },
     },
 

@@ -65,13 +65,80 @@ export class TasksService {
     };
 
     // US-TA-03 : `done` horodate la complétion ; en sortir la réinitialise.
+    let becameDone = false;
     if (dto.status && dto.status !== current.status) {
       data.status = dto.status;
-      if (dto.status === 'done') data.completedAt = new Date();
-      else if (current.status === 'done') data.completedAt = null;
+      if (dto.status === 'done') {
+        data.completedAt = new Date();
+        becameDone = true;
+      } else if (current.status === 'done') {
+        data.completedAt = null;
+      }
     }
 
-    return this.prisma.task.update({ where: { id }, data });
+    const updated = await this.prisma.task.update({ where: { id }, data });
+
+    // US-ST-03 : si une sous-tâche passe à done, compléter le parent quand
+    // toutes ses sous-tâches le sont (cascade vers le haut), si l'utilisateur
+    // ne l'a pas désactivé.
+    if (becameDone && current.parentTaskId) {
+      await this.maybeCompleteParents(ownerId, current.parentTaskId);
+    }
+    return updated;
+  }
+
+  // US-ST-01 — Sous-tâche : tâche enfant rattachée au même list que le parent.
+  async createSubtask(ownerId: string, parentId: string, dto: CreateTaskDto) {
+    const parent = await this.findOne(ownerId, parentId);
+    const last = await this.prisma.task.aggregate({
+      where: { parentTaskId: parentId },
+      _max: { position: true },
+    });
+    return this.prisma.task.create({
+      data: {
+        listId: parent.listId,
+        parentTaskId: parent.id,
+        ownerId,
+        title: dto.title,
+        description: dto.description,
+        dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
+        startAt: dto.startAt ? new Date(dto.startAt) : undefined,
+        priority: dto.priority,
+        estimatedMinutes: dto.estimatedMinutes,
+        position: (last._max.position ?? -1) + 1,
+      },
+    });
+  }
+
+  private async maybeCompleteParents(ownerId: string, parentTaskId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { autoCompleteSubtasks: true },
+    });
+    if (!user?.autoCompleteSubtasks) return;
+
+    let currentParentId: string | null = parentTaskId;
+    // Remonte tant qu'un parent bascule à done (profondeur illimitée).
+    while (currentParentId) {
+      const parent = await this.prisma.task.findFirst({
+        where: { id: currentParentId, ownerId },
+      });
+      if (!parent || parent.status === 'done' || parent.archivedAt) break;
+
+      const siblings = await this.prisma.task.findMany({
+        where: { parentTaskId: parent.id, archivedAt: null },
+        select: { status: true },
+      });
+      const allDone =
+        siblings.length > 0 && siblings.every((sibling) => sibling.status === 'done');
+      if (!allDone) break;
+
+      await this.prisma.task.update({
+        where: { id: parent.id },
+        data: { status: 'done', completedAt: new Date() },
+      });
+      currentParentId = parent.parentTaskId;
+    }
   }
 
   // US-TA-04 — Soft-delete (archive) + restauration tant que non purgée.
