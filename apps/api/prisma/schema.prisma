@@ -57,6 +57,7 @@ model User {
   recurrenceRules   RecurrenceRule[]
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  calendarAccounts  CalendarAccount[]
 
   @@index([deletedAt])
   @@map("users")
@@ -326,4 +327,38 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+// US-SY-01 — Agenda externe connecté (Google d'abord ; Microsoft/Apple aux
+// sprints 13/14 réutiliseront ce modèle via `provider`). Les tokens OAuth
+// vivent déjà chiffrés dans `accounts` (Better Auth, US-AU-05) : on ne les
+// duplique pas, on s'y réfère par `provider`. Ce modèle absorbe l'état de
+// sync (`sync_states` du MLD) : jeton delta + canal watch sont 1:1 avec
+// l'agenda connecté — une table séparée serait de la sur-normalisation.
+model CalendarAccount {
+  id                String @id @default(uuid()) @db.Uuid
+  userId            String @map("user_id") @db.Uuid
+  provider          String @default("google") @db.VarChar(16)
+  // Compte chez le provider (sub/e-mail Google) + agenda ciblé.
+  providerAccountId String @map("provider_account_id")
+  calendarId        String @default("primary") @map("calendar_id")
+
+  // US-SY-03 — état de sync : jeton incrémental Google + canal push watch.
+  syncToken       String?   @map("sync_token")
+  watchChannelId  String?   @map("watch_channel_id")
+  watchResourceId String?   @map("watch_resource_id")
+  watchExpiresAt  DateTime? @map("watch_expires_at")
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  // Déconnexion = soft : on conserve le mapping pour ne pas réémettre
+  // d'événements si l'utilisateur reconnecte.
+  disabledAt      DateTime? @map("disabled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, calendarId])
+  @@index([userId])
+  @@map("calendar_accounts")
 }
