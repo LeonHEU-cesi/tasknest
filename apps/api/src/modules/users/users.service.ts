@@ -2,14 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
 
+// US-US-01 — Profil public exposé par GET/PATCH /me. Forme alignée sur le
+// schéma Better Auth (`name`/`image`/`emailVerified`).
 export interface PublicProfile {
   id: string;
   email: string;
-  displayName: string;
+  name: string;
   locale: string;
   timezone: string;
-  avatarUrl: string | null;
-  emailVerifiedAt: Date | null;
+  image: string | null;
+  emailVerified: boolean;
   createdAt: Date;
 }
 
@@ -27,10 +29,10 @@ export class UsersService {
     const user = await this.prisma.user.update({
       where: { id },
       data: {
-        displayName: input.displayName,
+        name: input.name,
         locale: input.locale,
         timezone: input.timezone,
-        avatarUrl: input.avatarUrl,
+        image: input.image,
       },
     });
     return this.toPublic(user);
@@ -39,21 +41,21 @@ export class UsersService {
   private toPublic(user: {
     id: string;
     email: string;
-    displayName: string;
+    name: string;
     locale: string;
     timezone: string;
-    avatarUrl: string | null;
-    emailVerifiedAt: Date | null;
+    image: string | null;
+    emailVerified: boolean;
     createdAt: Date;
   }): PublicProfile {
     return {
       id: user.id,
       email: user.email,
-      displayName: user.displayName,
+      name: user.name,
       locale: user.locale,
       timezone: user.timezone,
-      avatarUrl: user.avatarUrl,
-      emailVerifiedAt: user.emailVerifiedAt,
+      image: user.image,
+      emailVerified: user.emailVerified,
       createdAt: user.createdAt,
     };
   }
