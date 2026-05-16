@@ -28,7 +28,7 @@
     "react-dom": "19.0.0",
     "react-native": "0.80.0",
     "react-native-safe-area-context": "5.0.0",
-    "react-native-screens": "~4.0.0"
+    "react-native-screens": "~4.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
