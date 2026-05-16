@@ -5,6 +5,21 @@
 
 ## Sprint 4 — Tasks core
 
+### Issue #22 — [4.2] US-LI-01 CRUD listes dans un projet
+
+`ListsModule` : listes imbriquées sous le projet.
+
+Backend
+- `POST/GET /projects/:projectId/lists`, `GET/PATCH/DELETE /lists/:id`.
+- Toute opération vérifie la possession du **projet parent** (`assertProject`) puis de la liste — pas d'accès transverse.
+- `viewDefault` ∈ {list,kanban,calendar,timeline}, soft-delete `archivedAt`.
+
+Tests validés (56/56)
+- `TF-LI-01` : create dans projet → list → get → update → archive ; `viewDefault` invalide → 400.
+- `TS` : créer une liste dans le projet d'un autre → 404 ; 401 sans session.
+
+---
+
 ### Issue #21 — [4.1] US-PR-01 CRUD projets
 
 Premier module produit. Modèles Prisma `Project`/`List`/`Task` posés ensemble (migration `tasks_core`) ; cette issue livre le CRUD projets.
