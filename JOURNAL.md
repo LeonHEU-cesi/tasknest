@@ -3,6 +3,106 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 2 — Auth OAuth
+
+### Issue #16 — [2.5] TS-AU-* suite de tests sécurité OAuth
+
+Suite de sécurité consolidée (`security.ts-au.e2e-spec.ts`) :
+- Cookie de session `tasknest.session_token` : `HttpOnly` + `SameSite` vérifiés.
+- Non-fuite : `get-session` et `/me` ne renvoient ni mot de passe ni tokens.
+- Callback OAuth (`/callback/google`) sans `state` ⇒ aucune session créée, statut ≠ 200 (anti-CSRF).
+- Tokens OAuth chiffrés au repos : insertion via `sealAccountTokens` puis lecture en base — colonnes illisibles, déchiffrables uniquement avec la clé.
+- Rappel : PKCE S256 + `state` + scopes déjà couverts par `TF/TS-AU-05/06/07`.
+
+Total tests API : **34/34** (8 fichiers).
+
+---
+
+### Issue #15 — [2.4] Stockage chiffré des tokens OAuth en base
+
+Durcissement et preuve du chiffrement introduit à l'issue [2.0].
+- Logique de scellement extraite en méthode pure testable `TokenCipher.sealAccountTokens()` (chiffre `accessToken`/`refreshToken`/`idToken`, laisse `providerId`/`scope`/`password` intacts).
+- Hooks Better Auth `databaseHooks.account.create|update.before` recâblés sur cette méthode.
+- Tests unitaires dédiés : champs chiffrés vs intacts, compte `credential` sans token non altéré, round-trip.
+
+Décision : déchiffrement **explicite** côté consommateurs (sync agenda, sprints US-SY-*), jamais en lecture transparente — limite la surface d'exposition du clair. Rotation de clé : prévue via ré-encodage hors-ligne quand `TASKNEST_DB_ENCRYPTION_KEY` changera (documenté, non requis tant qu'aucune donnée prod).
+
+---
+
+### Issue #14 — [2.3] US-AU-07 OAuth Apple login
+
+Provider Apple ajouté à l'instance Better Auth (scopes `name email` uniquement — l'agenda iCloud n'est PAS accessible par cette voie, séparé via CalDAV au sprint sync US-SY-07). Boutons « Sign in with Apple » sur `/login` et `/signup`.
+
+Tests validés (mocks)
+- `TF-AU-07` : autorisation `appleid.apple.com`, `response_type` hybride `code id_token`, `client_id` présent.
+- `TS-AU-07` : `state` anti-CSRF, aucun `client_secret` dans l'URL.
+
+Note : le `client_secret` Apple réel est un JWT signé (clé privée Apple Developer) — fourni ultérieurement par Léon pour le callback bout-en-bout.
+
+---
+
+### Issue #13 — [2.2] US-AU-06 OAuth Microsoft login
+
+Provider Microsoft (Identity Platform v2) ajouté. Scopes `openid email profile offline_access User.Read **Calendars.ReadWrite**` (mutualise auth + accès agenda pour la sync US-SY-04). `tenantId` configurable (`MICROSOFT_TENANT_ID`, défaut `common`). Boutons « Continue with Microsoft » sur `/login` et `/signup`.
+
+Tests validés (mocks)
+- `TF-AU-06` : autorisation `microsoftonline.com`, `response_type=code`, scopes incluant `Calendars.ReadWrite` + `offline_access`.
+- `TS-AU-06` : PKCE `code_challenge` + `S256`, `state`, pas de `client_secret` en clair.
+
+Liaison automatique multi-provider déjà active (`accountLinking.trustedProviders` posé à l'issue [2.0]). Tokens chiffrés au repos via les mêmes hooks. Total tests API : **27/27**.
+
+---
+
+### Issue #12 — [2.1] US-AU-05 OAuth Google (web)
+
+Connexion Google par-dessus la fondation Better Auth (provider configuré à l'issue [2.0]).
+
+Web
+- `lib/auth-client.ts` : client Better Auth React (baseURL `/api/v1/auth`, `credentials: include`).
+- Bouton **« Continue with Google »** sur `/login` ET `/signup` (`signIn.social({ provider: 'google' })`, `callbackURL` = `/settings`).
+- Pages auth entièrement re-backées sur le client : login, signup, verify-email (retour post-redirection), forgot-password (`requestPasswordReset`), reset (`resetPassword(token)`), settings (profil `name`/`image`/`emailVerified`).
+
+Backend
+- Provider Google : scopes `openid email profile` + `calendar` + `access_type=offline` (refresh token pour la sync agenda US-SY-*). Liaison automatique si e-mail déjà existant (`accountLinking`). Tokens chiffrés au repos (hooks `databaseHooks.account` + libsodium).
+
+Tests validés (23/23, mocks — pas de credentials Google réels)
+- `TF-AU-05` : `POST /sign-in/social` → URL d'autorisation Google conforme (`response_type=code`, `client_id`, scopes incluant `calendar`, `access_type=offline`).
+- `TS-AU-05` : PKCE `code_challenge` + `code_challenge_method=S256`, `state` anti-CSRF, pas de `client_secret` dans l'URL, state/PKCE distincts entre deux requêtes.
+- `token-cipher.spec` : round-trip, nonce aléatoire, rejet clé erronée / charge falsifiée / clé non 32 octets.
+- Non-régression Sprint 1 (auth + profil) toujours verte. `typecheck`/`lint` API + `build` web : 0 erreur.
+
+Décisions / périmètre
+- **Mobile PKCE reporté** : l'app Expo est encore un scaffold Sprint 0 sans aucun écran d'auth (le mobile a été différé au Sprint 1). Le flux OAuth mobile (expo-auth-session + Better Auth) nécessite d'abord de scaffolder l'auth mobile → issue de suivi dédiée plutôt que bâcler. Signalé au récap de sprint.
+- Callback Google bout-en-bout (échange de code) testable seulement avec credentials réels (fournis ultérieurement par Léon) ; ici on valide la requête d'autorisation + le chiffrement, conforme à l'approche « mocks ».
+
+---
+
+### Issue [2.0] — Fondation Better Auth (re-back de l'auth Sprint 1)
+
+Décision structurante validée avec Léon : **Better Auth devient le système d'auth complet** (pas seulement OAuth). L'auth hand-rolled du Sprint 1 est ré-implémentée sur Better Auth, pré-requis aux US-AU-05..07. Périmètre plus large que #12 nominal → traité comme une issue de fondation dédiée.
+
+Backend
+- **Schéma Prisma remodelé** sur Better Auth : `User`/`Session`/`Account`/`Verification` (remplace `email_verifications`/`password_resets`/`sessions` custom). Migration fraîche `better_auth_foundation` (projet pré-alpha, reset de dev assumé).
+- **`src/auth/better-auth.ts`** : fabrique async (import dynamique — better-auth est ESM-only), `emailAndPassword` avec **argon2id** (parité Sprint 1), provider Google (scopes `profile email calendar offline`), `accountLinking`, `additionalFields` (locale/timezone/isAdmin/suspendedAt/deletedAt), hooks de chiffrement des tokens OAuth.
+- **`src/common/crypto/token-cipher.ts`** : libsodium `secretbox` (clé `TASKNEST_DB_ENCRYPTION_KEY`, 32 octets) pour chiffrer access/refresh/id tokens au repos.
+- **`AuthModule` (@Global)** : provider async de l'instance ; **`AuthGuard`** basé sur la session Better Auth (remplace `SessionAuthGuard`) ; token d'injection isolé (`auth.tokens.ts`) pour casser le cycle module ↔ guard.
+- **`bootstrap.ts`** : configuration HTTP partagée prod/e2e — catch-all Better Auth (`toNodeHandler`) monté **avant** les body parsers, `/api/v1/auth/*`.
+- **`users.*`** recâblés sur le nouveau schéma (`name`/`image`/`emailVerified`).
+- Suppression de l'auth hand-rolled Sprint 1 (auth.service/controller/session.service/dto + session-auth.guard).
+
+Tests validés
+- **13/13 e2e verts** : non-régression complète signup / vérification e-mail / login+session / reset password (`auth.e2e-spec.ts`) + profil `/me` (`users.profile.e2e-spec.ts`) + health, tous via les endpoints Better Auth réels contre Postgres.
+- Helper e2e mutualisé (`test/utils/e2e-app.ts`) : app Better Auth réelle, capture des e-mails, helpers signup/verify/login.
+- `typecheck` (NodeNext) et `lint` API : 0 erreur.
+
+Décisions
+- **`apps/api` passé en `module/moduleResolution: NodeNext`** : seule façon propre de résoudre un paquet ESM-only (`exports`/`.d.mts`) tout en gardant `import()` dynamique en sortie CommonJS NestJS.
+- **Tokens OAuth chiffrés à l'écriture** via `databaseHooks.account` ; déchiffrement explicite côté consommateurs (sync agenda), jamais en lecture transparente.
+- **Dépendances déclarées** : `express` ajouté en dépendance directe (importé dans le bootstrap — était transitif), `dotenv` en devDep (setup e2e). Même principe que le fix `@eslint/js`.
+- `ci-api.yml` : `TASKNEST_DB_ENCRYPTION_KEY` corrigé en clé 32 octets valide (l'ancienne valeur faisait 35 octets).
+
+---
+
 ## Sprint 1 — Auth basique
 
 ### Issue #11 — [1.5] US-US-01 Profile read/edit

@@ -2,18 +2,10 @@
 
 import { Suspense, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ApiClientError, apiPost } from '@/lib/api-client';
+import { authClient } from '@/lib/auth-client';
 
-interface ResetPasswordBody {
-  token: string;
-  password: string;
-}
-
-interface ResetPasswordResponse {
-  id: string;
-  email: string;
-}
-
+// US-AU-04 — Choix d'un nouveau mot de passe. Le lien e-mail (via l'API
+// Better Auth) redirige ici avec ?token=.
 export default function ResetPasswordPage() {
   return (
     <main style={pageStyle}>
@@ -30,7 +22,7 @@ function ResetContent() {
   const token = params.get('token');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!token) {
@@ -42,29 +34,23 @@ function ResetContent() {
 
     if (password !== confirm) {
       setErrorMessage('Passwords do not match.');
-      setStatus('error');
       return;
     }
 
     setStatus('submitting');
     setErrorMessage(null);
 
-    try {
-      await apiPost<ResetPasswordBody, ResetPasswordResponse>('/auth/reset-password', {
-        token,
-        password,
-      });
-      setStatus('success');
-    } catch (error) {
-      setStatus('error');
-      if (error instanceof ApiClientError && error.status === 410) {
-        setErrorMessage('This reset link has expired. Please request a new one.');
-      } else {
-        setErrorMessage(
-          error instanceof ApiClientError ? error.message : 'Unexpected error, please retry.',
-        );
-      }
+    const { error } = await authClient.resetPassword({ newPassword: password, token });
+    if (error) {
+      setStatus('idle');
+      setErrorMessage(
+        error.status === 410
+          ? 'This reset link has expired. Please request a new one.'
+          : (error.message ?? 'Unexpected error, please retry.'),
+      );
+      return;
     }
+    setStatus('success');
   };
 
   if (status === 'success') {
@@ -80,11 +66,11 @@ function ResetContent() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
-          minLength={10}
+          minLength={8}
           autoComplete="new-password"
           style={inputStyle}
         />
-        <small>At least 10 characters with upper, lower and a digit.</small>
+        <small>At least 8 characters.</small>
       </label>
       <label style={labelStyle}>
         Confirm new password
@@ -93,7 +79,7 @@ function ResetContent() {
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
           required
-          minLength={10}
+          minLength={8}
           autoComplete="new-password"
           style={inputStyle}
         />

@@ -1,19 +1,13 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { ApiClientError, apiPost } from '@/lib/api-client';
+import { authClient } from '@/lib/auth-client';
 
-interface ForgotPasswordBody {
-  email: string;
-}
-
-interface ForgotPasswordResponse {
-  status: string;
-}
-
+// US-AU-04 — Demande de réinitialisation. Message neutre quel que soit le
+// résultat (anti-énumération). redirectTo = page /reset côté web.
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -21,15 +15,15 @@ export default function ForgotPasswordPage() {
     setStatus('submitting');
     setErrorMessage(null);
 
-    try {
-      await apiPost<ForgotPasswordBody, ForgotPasswordResponse>('/auth/forgot-password', { email });
-      setStatus('success');
-    } catch (error) {
-      setStatus('error');
-      setErrorMessage(
-        error instanceof ApiClientError ? error.message : 'Unexpected error, please retry.',
-      );
+    const redirectTo =
+      typeof window !== 'undefined' ? `${window.location.origin}/reset` : '/reset';
+    const { error } = await authClient.requestPasswordReset({ email, redirectTo });
+    if (error) {
+      setStatus('idle');
+      setErrorMessage(error.message ?? 'Unexpected error, please retry.');
+      return;
     }
+    setStatus('success');
   };
 
   return (

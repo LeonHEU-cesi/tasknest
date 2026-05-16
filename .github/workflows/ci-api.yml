@@ -58,14 +58,14 @@ jobs:
       DATABASE_URL: postgresql://tasknest:ci_password@localhost:5432/tasknest_ci?schema=public
       REDIS_URL: redis://localhost:6379
       AUTH_SECRET: ci_secret_dummy_value_for_tests_only
-      TASKNEST_DB_ENCRYPTION_KEY: dGVzdGVuY3J5cHRpb25rZXkzMmJ5dGVzbG9uZ2VuY29kZWQ=
+      TASKNEST_DB_ENCRYPTION_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-api
           path: apps/api/coverage
