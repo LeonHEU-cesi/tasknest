@@ -5,6 +5,18 @@
 
 ## Sprint 10 — Récurrence
 
+### Issue #55 — [10.2] US-RE-02 Génération d'occurrences (BullMQ, idempotent)
+
+Backend
+- `RecurrenceGenerationService.generateUpcoming(now, horizon=30, ownerId?)` : enumère la RRULE (`rrule.between`, dtstart = dueAt/startAt/createdAt) sur **J+1 → J+30** (bornes jour entières), `createMany({ skipDuplicates })` ⇒ **idempotent** (unique `(ruleId, occurrenceDate)`), n'écrase pas les exceptions.
+- `RecurrenceQueue` BullMQ : cron `30 0 * * *` (système), activé si `RECURRENCE_WORKER=1` (prod/dev) — pas en CI/e2e.
+- `POST /recurrence/run` (auth) : génération pour l'utilisateur courant (testable).
+
+Tests validés (98/98)
+- `TF-RE-02` : DAILY ⇒ 30 occurrences ; rerun ⇒ 0 (idempotent) ; exception non dupliquée/écrasée ; 401 sans session.
+
+---
+
 ### Issue #54 — [10.1] US-RE-01 Règle RRULE (modèle + lien tâche)
 
 Backend
