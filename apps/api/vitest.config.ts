@@ -16,6 +16,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    setupFiles: ['./test/setup-env.ts'],
     include: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
     exclude: ['node_modules/**', 'dist/**', '.turbo/**'],
     fileParallelism: false,

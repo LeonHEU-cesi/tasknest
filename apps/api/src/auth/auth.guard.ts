@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { BETTER_AUTH } from './auth.module';
+import { BETTER_AUTH } from './auth.tokens';
 import type { BetterAuthInstance } from './better-auth';
 
 // US-US-01 — Profil exposé aux contrôleurs protégés (forme alignée Better

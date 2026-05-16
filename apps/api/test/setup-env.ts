@@ -1,0 +1,28 @@
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { config } from 'dotenv';
+
+// Trouve la racine du monorepo en remontant depuis le cwd jusqu'au marqueur
+// pnpm-workspace.yaml. N'utilise ni import.meta (interdit en sortie CJS du
+// typecheck) ni __dirname (absent sous le runtime ESM de vitest).
+function findRepoRoot(start: string): string | undefined {
+  let dir = start;
+  for (let i = 0; i < 6; i += 1) {
+    if (existsSync(resolve(dir, 'pnpm-workspace.yaml'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
+}
+
+const root = findRepoRoot(process.cwd());
+if (root) {
+  // En CI le .env est absent : dotenv no-op, le job fournit ses variables.
+  config({ path: resolve(root, '.env'), override: true });
+}
+
+// Secrets de test si absents : le .env local n'a pas forcément les clés
+// Better Auth (nouvelles au Sprint 2). En CI, les valeurs du job priment.
+process.env.AUTH_SECRET ||= 'tasknest-e2e-auth-secret-not-for-prod';
+process.env.TASKNEST_DB_ENCRYPTION_KEY ||= 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';

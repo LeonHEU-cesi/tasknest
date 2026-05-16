@@ -5,14 +5,16 @@ import { MailService } from '../modules/mail/mail.service';
 import { MailModule } from '../modules/mail/mail.module';
 import { createBetterAuth, type BetterAuthInstance } from './better-auth';
 import { AuthGuard } from './auth.guard';
+import { BETTER_AUTH } from './auth.tokens';
 
 // US-AU-01..07 — Module d'auth Better Auth (système complet).
 // Pourquoi @Global : l'instance et le guard sont consommés par tous les
 // modules protégés (users, puis tasks/projects… aux sprints suivants) ;
 // on évite de ré-importer AuthModule partout.
 
-// Jeton d'injection de l'instance Better Auth résolue (fabrique async).
-export const BETTER_AUTH = Symbol('BETTER_AUTH');
+// Ré-export pour les consommateurs historiques (le symbole vit dans
+// auth.tokens pour casser le cycle module ↔ guard).
+export { BETTER_AUTH };
 
 @Global()
 @Module({
