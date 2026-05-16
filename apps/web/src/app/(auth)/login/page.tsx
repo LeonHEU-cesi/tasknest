@@ -8,7 +8,9 @@ import { signIn } from '@/lib/auth-client';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+  const [status, setStatus] = useState<
+    'idle' | 'submitting' | 'success' | 'magic-sent'
+  >('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const callbackURL =
@@ -39,11 +41,40 @@ export default function LoginPage() {
     await signIn.social({ provider, callbackURL });
   };
 
+  // US-AU-08 — connexion sans mot de passe : lien magique e-mail.
+  const handleMagicLink = async () => {
+    if (!email) {
+      setErrorMessage('Enter your email first.');
+      return;
+    }
+    setStatus('submitting');
+    setErrorMessage(null);
+    const { error } = await signIn.magicLink({ email, callbackURL });
+    if (error) {
+      setStatus('idle');
+      setErrorMessage(error.message ?? 'Unexpected error, please retry.');
+      return;
+    }
+    setStatus('magic-sent');
+  };
+
   if (status === 'success') {
     return (
       <main style={pageStyle}>
         <h1>You&apos;re signed in</h1>
         <p>The dashboard arrives in upcoming sprints.</p>
+      </main>
+    );
+  }
+
+  if (status === 'magic-sent') {
+    return (
+      <main style={pageStyle}>
+        <h1>Check your inbox</h1>
+        <p>
+          We&apos;ve sent a one-time sign-in link to <strong>{email}</strong>. It expires in 15
+          minutes.
+        </p>
       </main>
     );
   }
@@ -97,6 +128,15 @@ export default function LoginPage() {
           style={{ ...buttonStyle, opacity: status === 'submitting' ? 0.6 : 1 }}
         >
           {status === 'submitting' ? 'Signing in…' : 'Sign in'}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleMagicLink}
+          disabled={status === 'submitting'}
+          style={{ ...buttonStyle, opacity: status === 'submitting' ? 0.6 : 1 }}
+        >
+          Email me a sign-in link
         </button>
 
         {errorMessage ? <p style={errorStyle}>{errorMessage}</p> : null}
