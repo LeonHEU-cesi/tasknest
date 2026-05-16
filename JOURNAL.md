@@ -3,6 +3,47 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 10 — Récurrence
+
+### Issue #56/#57 — [10.3/10.4] US-RE-03/04 Édition/suppression instance vs série
+
+Backend
+- **Éditer une occurrence** (`PATCH /tasks/:id`) ⇒ `recurrenceException=true` auto (le générateur ne la régénère/écrase plus).
+- **Supprimer une occurrence** (`DELETE /tasks/:id`) ⇒ archivée **+ exception** (ligne tombstone ⇒ pas de recréation au run suivant).
+- **Éditer la série** : `PATCH /recurrence-rules/:id {rrule?,endAt?}` (RRULE validée) ⇒ purge des occurrences futures non-exception (rebâties au prochain run avec la nouvelle règle).
+- **Supprimer la série** : `DELETE /recurrence-rules/:id` ⇒ purge futur non-exception + suppression règle (FK SetNull : modèle/passées/exceptions deviennent des tâches normales).
+
+Tests validés (102/102)
+- `TF-RE-03` : édition occurrence ⇒ exception ; édition série purge le futur, exception conservée.
+- `TF-RE-04` : suppression occurrence ⇒ tombstone non recréé ; suppression série ⇒ règle + futur supprimés, modèle détaché ; règle d'un autre → 404.
+
+---
+
+### Issue #55 — [10.2] US-RE-02 Génération d'occurrences (BullMQ, idempotent)
+
+Backend
+- `RecurrenceGenerationService.generateUpcoming(now, horizon=30, ownerId?)` : enumère la RRULE (`rrule.between`, dtstart = dueAt/startAt/createdAt) sur **J+1 → J+30** (bornes jour entières), `createMany({ skipDuplicates })` ⇒ **idempotent** (unique `(ruleId, occurrenceDate)`), n'écrase pas les exceptions.
+- `RecurrenceQueue` BullMQ : cron `30 0 * * *` (système), activé si `RECURRENCE_WORKER=1` (prod/dev) — pas en CI/e2e.
+- `POST /recurrence/run` (auth) : génération pour l'utilisateur courant (testable).
+
+Tests validés (98/98)
+- `TF-RE-02` : DAILY ⇒ 30 occurrences ; rerun ⇒ 0 (idempotent) ; exception non dupliquée/écrasée ; 401 sans session.
+
+---
+
+### Issue #54 — [10.1] US-RE-01 Règle RRULE (modèle + lien tâche)
+
+Backend
+- Modèle `RecurrenceRule` (ownerId, `rrule` RFC 5545, endAt) + champs `Task.recurrenceRuleId`/`occurrenceDate`/`recurrenceException` + `@@unique([recurrenceRuleId, occurrenceDate])` (dedupe occurrences). Dep `rrule`. Migration `recurrence_rules`.
+- `PUT /tasks/:id/recurrence {rrule, endAt?}` : valide la RRULE (`RRule.fromString` → 400 si invalide), crée la règle, attache à la tâche modèle (`occurrenceDate` null) ; `DELETE` détache ; `GET /recurrence-rules` liste.
+
+Note infra : **`prisma migrate dev` bloqué non-interactif** dans cet env → migration générée via `prisma migrate diff` + appliquée par `prisma migrate deploy` (consigné en mémoire).
+
+Tests validés (95/95)
+- `TF-RE-01` : RRULE valide attachée/listée/détachée ; RRULE invalide → 400 ; tâche d'un autre → 404.
+
+---
+
 ## Sprint 9 — Vue Timeline / Gantt
 
 ### Issue #50/#51/#52 — [9.1/9.2/9.3] US-VW-07/08 Timeline + édition + visual reg

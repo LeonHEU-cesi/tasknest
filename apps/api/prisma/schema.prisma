@@ -46,9 +46,10 @@ model User {
   twoFactors TwoFactor[]
   projects      Project[]
   lists         List[]
-  tasks         Task[]   @relation("TaskOwner")
-  assignedTasks Task[]   @relation("TaskAssignee")
-  tags          Tag[]
+  tasks           Task[]           @relation("TaskOwner")
+  assignedTasks   Task[]           @relation("TaskAssignee")
+  tags            Tag[]
+  recurrenceRules RecurrenceRule[]
 
   @@index([deletedAt])
   @@map("users")
@@ -203,16 +204,25 @@ model Task {
   position         Int       @default(0)
   completedAt      DateTime? @map("completed_at")
   archivedAt       DateTime? @map("archived_at")
+  // US-RE-01..04 — récurrence. Une tâche "modèle" porte recurrenceRuleId
+  // (occurrenceDate null) ; chaque occurrence générée a (recurrenceRuleId,
+  // occurrenceDate) unique. recurrenceException : occurrence éditée à la
+  // main, le générateur ne la régénère/écrase plus.
+  recurrenceRuleId    String?   @map("recurrence_rule_id") @db.Uuid
+  occurrenceDate      DateTime? @map("occurrence_date")
+  recurrenceException Boolean   @default(false) @map("recurrence_exception")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  children Task[] @relation("Subtasks")
-  parent   Task?  @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  list     List      @relation(fields: [listId], references: [id], onDelete: Cascade)
-  owner    User      @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  assignee User?     @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
-  taskTags TaskTag[]
+  children       Task[]          @relation("Subtasks")
+  parent         Task?           @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  list           List            @relation(fields: [listId], references: [id], onDelete: Cascade)
+  owner          User            @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  assignee       User?           @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  taskTags       TaskTag[]
+  recurrenceRule RecurrenceRule? @relation(fields: [recurrenceRuleId], references: [id], onDelete: SetNull)
 
+  @@unique([recurrenceRuleId, occurrenceDate])
   @@index([listId])
   @@index([ownerId, status])
   @@index([ownerId, dueAt])
@@ -252,4 +262,20 @@ model TaskTag {
   @@id([taskId, tagId])
   @@index([tagId])
   @@map("task_tags")
+}
+
+// US-RE-01 — Règle de récurrence RFC 5545 (RRULE). endAt = borne dure
+// éventuelle (en plus d'un UNTIL/COUNT dans la RRULE).
+model RecurrenceRule {
+  id        String    @id @default(uuid()) @db.Uuid
+  ownerId   String    @map("owner_id") @db.Uuid
+  rrule     String
+  endAt     DateTime? @map("end_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  owner User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@index([ownerId])
+  @@map("recurrence_rules")
 }
