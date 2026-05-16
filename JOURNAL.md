@@ -3,6 +3,56 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 13 — Sync Microsoft Graph
+
+### Issue #71 — [13.4] TS-SY-MS + handling refresh token
+
+- `MicrosoftGraphHttpTransport` déjà durci au #68 (même `call()` que Google : back-off plafonné, `Retry-After` s/date, `isRetryableMicrosoft` = 429/5xx + 403 throttle, 404/410 absorbés sur delete/unsubscribe). `fetch`/`sleep`/`maxRetries` injectables.
+- Refresh : `invalid_grant` (400) ⇒ erreur définitive (le service désactive le compte + 409 reconnexion). **Limitation documentée** (parité Google) : rotation/persistance du refresh_token MS non gérée — suivi ultérieur, hors scope sync.
+
+Tests validés (163/163, +10)
+- `TS-SY-MS` (unit, fetch/sleep mockés, 17 ms) : token endpoint tenant, invalid_grant non rejoué, 429→retry→succès, 5xx persistant ⇒ erreur rejouable après `maxRetries`, `Retry-After` respecté, 403 throttle vs simple, 404/410 absorbés (delete/unsubscribe), 410 list ⇒ deltaExpired, subscribe typé.
+
+---
+
+### Issue #70 — [13.3] US-SY-06 Worker pull Outlook + subscriptions webhook
+
+- `MicrosoftPullService` : même logique que le pull Google (delta incrémental, pas de ping-pong via réalignement `pushedHash`, périmètre = events tagués Tasknest) ; spécifique Graph : jeton `@odata.deltaLink` (stocké dans `syncToken`), resync complet sur `deltaExpired`, suppression via **tombstone `@removed`** (le tag absent ⇒ on retrouve la tâche par le mapping `googleEventId`).
+- Souscriptions Graph : `registerSubscription` (TTL 3 jours, `clientState` aléatoire = secret stocké dans `watchResourceId`), gaté `SYNC_MS_WEBHOOK_URL` (best-effort, cron filet sinon).
+- Webhook `POST /integrations/microsoft/webhook` **non authentifié** : (1) **validation** Graph → écho `validationToken` en `text/plain` 200 ; (2) notification → vérifie `clientState` puis pull du compte, 202. `SyncQueue` fait aussi pull MS.
+
+Tests validés (153/153, +6)
+- `TF-SY-06` : maj Outlook→tâche sans aller-retour + idempotent, suppression `@removed`⇒archivage+soft-delete, deltaLink expiré⇒resync sans crash, webhook (validation echo + clientState invalide ignoré + notif valide), subscribe best-effort selon env, 401.
+
+---
+
+### Issue #69 — [13.2] US-SY-05 Worker push tâches → événements Outlook
+
+- `MicrosoftPushService` : **même algorithme idempotent** que le push Google (`pushedHash`, soft-delete, erreurs isolées par tâche, `lastSyncedAt`), seules les primitives transport changent (Graph `/me/events`, pas de `calendarId`). `PushResult` réutilisé. `SyncEvent.googleEventId` stocke l'id d'event MS (colonne réutilisée, documenté).
+- Endpoint déterministe `POST /integrations/microsoft/push` ; `SyncQueue` pousse aussi MS dans le job `*/10 min` (gating `SYNC_WORKER=1` inchangé).
+
+Tests validés (147/147, +3)
+- `TF-SY-05` : rien sans connexion, create⇒1 event Graph **tagué** (`singleValueExtendedProperties`) + mapping, re-push idempotent (skip), patch sur changement de titre, tâche sans échéance ignorée, archivage ⇒ event supprimé (tombstone `@removed`) + mapping soft-deleted, re-push stable, 401.
+
+---
+
+### Issue #68 — [13.1] US-SY-04 Connexion compte Microsoft 365 / Outlook
+
+Clonage de l'ossature Sprint 12 paramétrée `provider='microsoft'` — **aucune migration** (`CalendarAccount`/`SyncEvent` discriminés par `provider`, colonnes réutilisées).
+
+Backend
+- `MicrosoftCalendarTransport` (interface) + `MicrosoftGraphHttpTransport` : `call()` durci (back-off + Retry-After, design identique à Google #67), token endpoint `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`, API Graph `/me/events`, delta `@odata.deltaLink`, subscriptions, tag tâche via `singleValueExtendedProperties`.
+- `microsoft-sync.mapper.ts` : `taskToMicrosoftEvent` (subject/body/start-end Graph) ; **réutilise tels quels** `taskPushHash`/`isSyncEligible` du Sprint 12 (logique provider-neutre, zéro duplication).
+- `MicrosoftCalendarService` connect/status/disconnect/getAccessToken (pas de 2ᵉ flux OAuth : réutilise le refresh_token chiffré + scope `Calendars.ReadWrite` du sign-in MS Sprint 2 ; `TokenCipher` provider partagé). `MicrosoftSyncController` sous `integrations/microsoft`.
+
+Web
+- `/settings/integrations` refactorée en `<IntegrationCard>` réutilisable (Google + Outlook), parité connect/disconnect.
+
+Tests validés (144/144, +6)
+- `TF-SY-04` : refus sans compte/scope, connect valide le token (idempotent), statut, déconnexion, **coexistence Google/Microsoft par provider**, refresh révoqué ⇒ 502, 401. Helper e2e `linkMicrosoftAccount` + `ctx.microsoft` (FakeMicrosoftGraph).
+
+---
+
 ## Sprint 12 — Sync Google Calendar
 
 ### Issue #67 — [12.4] TS-SY-GOOGLE + handling rate-limit

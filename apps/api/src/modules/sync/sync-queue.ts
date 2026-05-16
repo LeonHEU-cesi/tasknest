@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
 import { GooglePushService } from './google-push.service';
 import { GooglePullService } from './google-pull.service';
+import { MicrosoftPushService } from './microsoft-push.service';
+import { MicrosoftPullService } from './microsoft-pull.service';
 
 // US-SY-02/03 — Cron BullMQ : push tâches→Google puis pull Google→tâches
 // (tous les comptes connectés). Le webhook watch donne le quasi-temps réel ;
@@ -22,6 +24,8 @@ export class SyncQueue implements OnModuleInit, OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly push: GooglePushService,
     private readonly pull: GooglePullService,
+    private readonly msPush: MicrosoftPushService,
+    private readonly msPull: MicrosoftPullService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -39,9 +43,12 @@ export class SyncQueue implements OnModuleInit, OnModuleDestroy {
         async () => {
           const p = await this.push.pushAll();
           const g = await this.pull.pullAll();
+          const mp = await this.msPush.pushAll();
+          const mg = await this.msPull.pullAll();
           this.logger.log(
-            `Sync Google : push +${p.created} ~${p.updated} -${p.deleted} | ` +
-              `pull ~${g.updated} -${g.archived}`,
+            `Sync : Google push +${p.created} ~${p.updated} -${p.deleted} ` +
+              `pull ~${g.updated} -${g.archived} | MS push +${mp.created} ~${mp.updated} -${mp.deleted} ` +
+              `pull ~${mg.updated} -${mg.archived}`,
           );
         },
         { connection },

@@ -7,7 +7,9 @@ import { PrismaService } from '../../src/db/prisma.service';
 import { MailService } from '../../src/modules/mail/mail.service';
 import { TokenCipher } from '../../src/common/crypto/token-cipher';
 import { GOOGLE_CALENDAR_TRANSPORT } from '../../src/modules/sync/google-calendar.transport';
+import { MICROSOFT_CALENDAR_TRANSPORT } from '../../src/modules/sync/microsoft-calendar.transport';
 import { FakeGoogleCalendar } from './fake-google-calendar';
+import { FakeMicrosoftGraph } from './fake-microsoft-graph';
 
 // Capture les e-mails au lieu de les envoyer : les tests récupèrent les
 // URLs (token de vérification / reset) directement depuis ce stub.
@@ -54,16 +56,20 @@ export interface E2EContext {
   prisma: PrismaService;
   mail: MailCapture;
   google: FakeGoogleCalendar;
+  microsoft: FakeMicrosoftGraph;
 }
 
 export async function createE2EApp(): Promise<E2EContext> {
   const mail = new MailCapture();
   const google = new FakeGoogleCalendar();
+  const microsoft = new FakeMicrosoftGraph();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(MailService)
     .useValue(mail)
     .overrideProvider(GOOGLE_CALENDAR_TRANSPORT)
     .useValue(google)
+    .overrideProvider(MICROSOFT_CALENDAR_TRANSPORT)
+    .useValue(microsoft)
     .compile();
 
   // bodyParser:false + configureApp ⇒ même montage Better Auth qu'en prod.
@@ -73,7 +79,7 @@ export async function createE2EApp(): Promise<E2EContext> {
   await configureApp(app, ['http://localhost:3000']);
   await app.init();
 
-  return { app, prisma: app.get(PrismaService), mail, google };
+  return { app, prisma: app.get(PrismaService), mail, google, microsoft };
 }
 
 // Ordre FK-safe (account/session/verification + sync dépendent de user).
@@ -107,6 +113,31 @@ export async function linkGoogleAccount(
       scope:
         opts.scope === undefined
           ? 'openid email profile https://www.googleapis.com/auth/calendar'
+          : opts.scope ?? undefined,
+    },
+  });
+}
+
+// US-SY-04 — Simule la liaison d'un compte Microsoft (sign-in OAuth MS) :
+// ligne `accounts` provider microsoft, refresh_token chiffré, scope
+// Calendars.ReadWrite + offline_access.
+export async function linkMicrosoftAccount(
+  ctx: E2EContext,
+  userId: string,
+  opts: { refreshToken?: string; scope?: string | null } = {},
+): Promise<void> {
+  testCipher ??= await TokenCipher.create(process.env.TASKNEST_DB_ENCRYPTION_KEY);
+  const refresh = opts.refreshToken ?? 'ms-refresh-token-test';
+  await ctx.prisma.account.create({
+    data: {
+      accountId: `ms-sub-${userId}`,
+      providerId: 'microsoft',
+      userId,
+      refreshToken: testCipher.encrypt(refresh),
+      accessToken: testCipher.encrypt('ms-access-token-test'),
+      scope:
+        opts.scope === undefined
+          ? 'openid email profile offline_access Calendars.ReadWrite'
           : opts.scope ?? undefined,
     },
   });
