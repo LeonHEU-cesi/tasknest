@@ -5,6 +5,16 @@
 
 ## Sprint 13 — Sync Microsoft Graph
 
+### Issue #71 — [13.4] TS-SY-MS + handling refresh token
+
+- `MicrosoftGraphHttpTransport` déjà durci au #68 (même `call()` que Google : back-off plafonné, `Retry-After` s/date, `isRetryableMicrosoft` = 429/5xx + 403 throttle, 404/410 absorbés sur delete/unsubscribe). `fetch`/`sleep`/`maxRetries` injectables.
+- Refresh : `invalid_grant` (400) ⇒ erreur définitive (le service désactive le compte + 409 reconnexion). **Limitation documentée** (parité Google) : rotation/persistance du refresh_token MS non gérée — suivi ultérieur, hors scope sync.
+
+Tests validés (163/163, +10)
+- `TS-SY-MS` (unit, fetch/sleep mockés, 17 ms) : token endpoint tenant, invalid_grant non rejoué, 429→retry→succès, 5xx persistant ⇒ erreur rejouable après `maxRetries`, `Retry-After` respecté, 403 throttle vs simple, 404/410 absorbés (delete/unsubscribe), 410 list ⇒ deltaExpired, subscribe typé.
+
+---
+
 ### Issue #70 — [13.3] US-SY-06 Worker pull Outlook + subscriptions webhook
 
 - `MicrosoftPullService` : même logique que le pull Google (delta incrémental, pas de ping-pong via réalignement `pushedHash`, périmètre = events tagués Tasknest) ; spécifique Graph : jeton `@odata.deltaLink` (stocké dans `syncToken`), resync complet sur `deltaExpired`, suppression via **tombstone `@removed`** (le tag absent ⇒ on retrouve la tâche par le mapping `googleEventId`).
