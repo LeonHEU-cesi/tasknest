@@ -11,6 +11,9 @@ import { SyncController } from './sync.controller';
 import { MicrosoftSyncController } from './microsoft-sync.controller';
 import { SyncWebhookController } from './sync-webhook.controller';
 import { MicrosoftWebhookController } from './microsoft-webhook.controller';
+import { CaldavService } from './caldav.service';
+import { CaldavSyncController } from './caldav-sync.controller';
+import { CALDAV_TRANSPORT, CaldavHttpTransport } from './caldav.transport';
 import { SyncQueue } from './sync-queue';
 import {
   GOOGLE_CALENDAR_TRANSPORT,
@@ -32,6 +35,7 @@ import {
     MicrosoftSyncController,
     SyncWebhookController,
     MicrosoftWebhookController,
+    CaldavSyncController,
   ],
   providers: [
     GoogleCalendarService,
@@ -40,6 +44,7 @@ import {
     MicrosoftCalendarService,
     MicrosoftPushService,
     MicrosoftPullService,
+    CaldavService,
     SyncQueue,
     {
       provide: TokenCipher,
@@ -66,6 +71,10 @@ import {
         ),
       inject: [ConfigService],
     },
+    {
+      provide: CALDAV_TRANSPORT,
+      useFactory: () => new CaldavHttpTransport(),
+    },
   ],
   exports: [
     GoogleCalendarService,
@@ -74,6 +83,7 @@ import {
     MicrosoftCalendarService,
     MicrosoftPushService,
     MicrosoftPullService,
+    CaldavService,
   ],
 })
 export class SyncModule {}

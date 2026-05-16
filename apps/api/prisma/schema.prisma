@@ -354,6 +354,15 @@ model CalendarAccount {
   // d'événements si l'utilisateur reconnecte.
   disabledAt      DateTime? @map("disabled_at")
 
+  // US-SY-07 — CalDAV (provider="caldav"). Pas d'OAuth : auth Basic avec
+  // app-password CHIFFRÉ au repos (TokenCipher, jamais en clair). `kind` =
+  // icloud|nextcloud|samsung|generic (détecté depuis l'URL, informatif).
+  // Pour les providers OAuth ces colonnes restent nulles.
+  caldavUrl      String? @map("caldav_url")
+  caldavUsername String? @map("caldav_username")
+  caldavPassword String? @map("caldav_password")
+  caldavKind     String? @map("caldav_kind") @db.VarChar(16)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

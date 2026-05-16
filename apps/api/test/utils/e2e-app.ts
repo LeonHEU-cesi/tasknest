@@ -8,8 +8,10 @@ import { MailService } from '../../src/modules/mail/mail.service';
 import { TokenCipher } from '../../src/common/crypto/token-cipher';
 import { GOOGLE_CALENDAR_TRANSPORT } from '../../src/modules/sync/google-calendar.transport';
 import { MICROSOFT_CALENDAR_TRANSPORT } from '../../src/modules/sync/microsoft-calendar.transport';
+import { CALDAV_TRANSPORT } from '../../src/modules/sync/caldav.transport';
 import { FakeGoogleCalendar } from './fake-google-calendar';
 import { FakeMicrosoftGraph } from './fake-microsoft-graph';
+import { FakeCaldav } from './fake-caldav';
 
 // Capture les e-mails au lieu de les envoyer : les tests récupèrent les
 // URLs (token de vérification / reset) directement depuis ce stub.
@@ -57,12 +59,14 @@ export interface E2EContext {
   mail: MailCapture;
   google: FakeGoogleCalendar;
   microsoft: FakeMicrosoftGraph;
+  caldav: FakeCaldav;
 }
 
 export async function createE2EApp(): Promise<E2EContext> {
   const mail = new MailCapture();
   const google = new FakeGoogleCalendar();
   const microsoft = new FakeMicrosoftGraph();
+  const caldav = new FakeCaldav();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(MailService)
     .useValue(mail)
@@ -70,6 +74,8 @@ export async function createE2EApp(): Promise<E2EContext> {
     .useValue(google)
     .overrideProvider(MICROSOFT_CALENDAR_TRANSPORT)
     .useValue(microsoft)
+    .overrideProvider(CALDAV_TRANSPORT)
+    .useValue(caldav)
     .compile();
 
   // bodyParser:false + configureApp ⇒ même montage Better Auth qu'en prod.
@@ -79,7 +85,7 @@ export async function createE2EApp(): Promise<E2EContext> {
   await configureApp(app, ['http://localhost:3000']);
   await app.init();
 
-  return { app, prisma: app.get(PrismaService), mail, google, microsoft };
+  return { app, prisma: app.get(PrismaService), mail, google, microsoft, caldav };
 }
 
 // Ordre FK-safe (account/session/verification + sync dépendent de user).
