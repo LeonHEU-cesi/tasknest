@@ -86,6 +86,19 @@ export class MailService {
     }
   }
 
+  async sendDigestEmail(to: string, html: string): Promise<void> {
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject: 'Your Tasknest daily digest',
+        html,
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to send digest email to ${to}`, error);
+    }
+  }
+
   async sendPasswordChangedEmail(to: string): Promise<void> {
     const html = `
       <p>Your Tasknest password has just been changed.</p>

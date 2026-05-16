@@ -3,6 +3,52 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 11 — Notifications
+
+### Issue #62 — [11.5] US-NO-05 Centre de notifications in-app
+
+Backend
+- `GET /notifications` (paginé curseur `before` + `limit`, **compteur non-lus**), `PATCH /notifications/:id/read`, `POST /notifications/read-all` — owner-scoped, ne renvoie que les notifs matérialisées (`sentAt` non null).
+
+Web
+- `components/notification-bell.tsx` : cloche header avec compteur non-lus (poll 60s), lien `/notifications`. Intégrée au header de la coquille `(app)`.
+- Page `/notifications` : liste + « mark read » / « mark all read ».
+
+Tests validés (113/113)
+- `TF-NO-05` : liste + unreadCount, mark-read décrémente, read-all → 0, pagination `limit`, 401 sans session. Playwright 6/6 (non-régression vues, cloche n'altère rien).
+
+Périmètre
+- **#59 (push Expo mobile) reporté hors M11** — app mobile sans foundation (dépend #154).
+
+---
+
+### Issue #60/#61 — [11.3/11.4] US-NO-03/04 Rappels avant échéance + digest
+
+Backend
+- `NotificationSchedulerService` : `generateReminders` (offsets **T-15min/T-1h/T-1j** avant `dueAt`, uniquement à venir, idempotent via unique `(taskId,type,scheduledFor)` + `createMany skipDuplicates`, respecte `notifyReminders`), `dispatchDue` (marque `sentAt` + Web Push si `notifyWebPush`), `sendDailyDigest` (e-mail HTML « du jour + en retard », **idempotent par user/jour**, respecte `notifyDigest`+`notifyEmail`).
+- `MailService.sendDigestEmail`. `NotificationsQueue` BullMQ : crons rappels `*/5 * * * *` + digest `0 8 * * *`, gating `NOTIFICATIONS_WORKER=1` (hors CI/e2e). Endpoints triggers `POST /notifications/run-reminders|dispatch|run-digest` (owner-scoped, déterministes).
+
+Tests validés (110/110)
+- `TF-NO-03` : 2 rappels créés (T-15/T-1h ; T-1j passé exclu), rerun idempotent, dispatch marque envoyés ; aucun si `notifyReminders=false`.
+- `TF-NO-04` : digest envoyé (MailCapture), idempotent le même jour ; 401 sans session.
+
+---
+
+### Issue #58/#63 — [11.1/11.6] US-NO-01/06 Web Push (VAPID) + préférences
+
+Backend
+- Modèles `Notification` (MLD : type/channel/payload/scheduledFor/sentAt/readAt, unique `(taskId,type,scheduledFor)`) + `PushSubscription` (endpoint unique) + 4 prefs booléennes sur `User` (`notify*`) + better-auth additionalFields. Migration `notifications` (diff+deploy).
+- `web-push` : clés VAPID depuis l'env, **générées à la volée** si absentes (dev/test). Endpoints `GET /push/vapid-public-key`, `POST/DELETE /push/subscribe` (upsert idempotent), `GET/PATCH /me/notification-prefs`. `pushToUser()` (best-effort, nettoie les abonnements 404/410) prêt pour les rappels.
+
+Web
+- `public/sw.js` (service worker : `push` → showNotification, `notificationclick` → focus/open).
+- Page `/settings/notifications` : toggles préférences + bouton « Enable web push » (register SW + subscribe + POST).
+
+Tests validés (106/106)
+- `TF-NO-01` : clé VAPID exposée ; subscribe idempotent (upsert) ; unsubscribe ; `TF-NO-06` : prefs défaut + toggles ; 401 sans session. web tc/lint/build verts.
+
+---
+
 ## Sprint 10 — Récurrence
 
 ### Issue #56/#57 — [10.3/10.4] US-RE-03/04 Édition/suppression instance vs série

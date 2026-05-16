@@ -25,6 +25,11 @@ export class MailCapture {
     this.magicLinks.set(to, url);
   };
 
+  readonly digests = new Map<string, string>();
+  sendDigestEmail = async (to: string, html: string): Promise<void> => {
+    this.digests.set(to, html);
+  };
+
   sendPasswordChangedEmail = async (): Promise<void> => undefined;
 
   // verify-email : token en query (?token=). request-password-reset :
