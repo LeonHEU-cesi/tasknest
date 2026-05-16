@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TokenCipher } from '../../common/crypto/token-cipher';
 import { GoogleCalendarService } from './google-calendar.service';
+import { GooglePushService } from './google-push.service';
 import { SyncController } from './sync.controller';
+import { SyncQueue } from './sync-queue';
 import {
   GOOGLE_CALENDAR_TRANSPORT,
   GoogleCalendarHttpTransport,
@@ -17,6 +19,8 @@ import {
   controllers: [SyncController],
   providers: [
     GoogleCalendarService,
+    GooglePushService,
+    SyncQueue,
     {
       provide: TokenCipher,
       useFactory: (config: ConfigService) =>
@@ -33,6 +37,6 @@ import {
       inject: [ConfigService],
     },
   ],
-  exports: [GoogleCalendarService],
+  exports: [GoogleCalendarService, GooglePushService],
 })
 export class SyncModule {}
