@@ -1,0 +1,47 @@
+name: CI · Web E2E
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/ci-e2e-web.yml"
+      - "pnpm-lock.yaml"
+  push:
+    branches: [develop, main]
+    paths:
+      - "apps/web/**"
+
+concurrency:
+  group: ci-e2e-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright (List + Kanban)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      NODE_ENV: test
+      # API moquée par interception : pas de back/DB requis.
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm --filter @tasknest/web exec playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: pnpm --filter @tasknest/web test:e2e

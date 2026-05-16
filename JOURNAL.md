@@ -5,6 +5,19 @@
 
 ## Sprint 7 — Vue List + Kanban
 
+### Issue #45 — [7.5] TF-WEB-VW-* Playwright (List + Kanban)
+
+Mise en place de l'infra de tests E2E web (différée depuis le Sprint 0).
+
+- `@playwright/test` + `playwright.config.ts` (webServer = build+start, port dédié) ; script `test:e2e` = `playwright test`.
+- `e2e/views.spec.ts` : **API moquée par interception réseau** (déterministe, pas de back/DB) — TF-WEB-VW-01/02 (Vue Liste : sélection projet/liste, groupement par statut, repli de groupe) + TF-WEB-VW-03/04 (Kanban : colonnes rendues, éditeur retire une colonne).
+- Workflow CI dédié `ci-e2e-web.yml` (install chromium `--with-deps`, sur PR touchant `apps/web`).
+
+Tests validés
+- Playwright **2/2 verts** en local (28.9s). Note : warning Next `experimental.typedRoutes` → `typedRoutes` (drift config non bloquant, dette mineure).
+
+---
+
 ### Issue #43/#44 — [7.3/7.4] US-VW-03/04 Vue Kanban (DnD + colonnes personnalisables)
 
 Backend

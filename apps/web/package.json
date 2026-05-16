@@ -9,7 +9,7 @@
     "build": "next build",
     "test": "vitest run",
     "test:unit": "vitest run src",
-    "test:e2e": "node -e \"console.log('@tasknest/web test:e2e — Playwright lands in a later sprint')\"",
+    "test:e2e": "playwright test",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
     "typecheck": "tsc --noEmit",
@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^20.17.0",
     "@types/qrcode": "^1.5.6",
