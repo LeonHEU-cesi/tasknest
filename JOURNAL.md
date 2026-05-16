@@ -3,6 +3,57 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 4 — Tasks core
+
+### Issue #23-#27 — [4.3-4.7] US-TA-01..04 Tâches core + baseline tests
+
+`TasksModule` couvrant création, édition, transitions de statut, archivage/restauration, + baseline de tests (#27).
+
+Backend
+- `POST/GET /lists/:listId/tasks`, `GET/PATCH/DELETE /tasks/:id`, `POST /tasks/:id/restore`.
+- US-TA-01 : `title` requis, `position` auto en fin de liste (`aggregate _max`).
+- US-TA-02 : édition partielle (title/description/priority/dates/estimate/position).
+- US-TA-03 : `status` ∈ {todo,doing,done,postponed,canceled} ; `done` → `completedAt=now`, en sortir → `completedAt=null`.
+- US-TA-04 : soft-delete `archivedAt` + `restore` tant que non purgée.
+- Owner-scoped, vérif possession liste/tâche.
+
+Tests validés (61/61, 15 fichiers — #27 baseline)
+- `TF-TA-01..04` : create+position, édition, statut/completedAt, archive/restore ; statut invalide → 400.
+- `TS` : tâche d'un autre → 404 ; 401 sans session. Non-régression projects/lists/auth verte.
+
+---
+
+### Issue #22 — [4.2] US-LI-01 CRUD listes dans un projet
+
+`ListsModule` : listes imbriquées sous le projet.
+
+Backend
+- `POST/GET /projects/:projectId/lists`, `GET/PATCH/DELETE /lists/:id`.
+- Toute opération vérifie la possession du **projet parent** (`assertProject`) puis de la liste — pas d'accès transverse.
+- `viewDefault` ∈ {list,kanban,calendar,timeline}, soft-delete `archivedAt`.
+
+Tests validés (56/56)
+- `TF-LI-01` : create dans projet → list → get → update → archive ; `viewDefault` invalide → 400.
+- `TS` : créer une liste dans le projet d'un autre → 404 ; 401 sans session.
+
+---
+
+### Issue #21 — [4.1] US-PR-01 CRUD projets
+
+Premier module produit. Modèles Prisma `Project`/`List`/`Task` posés ensemble (migration `tasks_core`) ; cette issue livre le CRUD projets.
+
+Backend
+- Schéma : `projects`/`lists`/`tasks` (MLD), `Task.parentTaskId` self-relation (sous-tâches Sprint 5), relations `User.projects/lists/tasks`. Migration `20260516085242_tasks_core`.
+- `ProjectsModule` (CRUD), protégé `@UseGuards(AuthGuard)`, **scopé propriétaire** (`@CurrentUser().id`) : un utilisateur ne voit/modifie jamais les projets d'un autre.
+- `DELETE` = soft-delete (`archivedAt`), `GET ?includeArchived=true` pour les revoir.
+- `ParseUUIDPipe` sur les params id.
+
+Tests validés (52/52)
+- `TF-PR-01` : create→list→get, validation `name` (400), update, soft-delete (absent par défaut, présent avec includeArchived).
+- `TS` : 401 sans session ; **isolation** — un projet d'Alice renvoie 404 pour Bob (get + patch).
+
+---
+
 ## Sprint 3 — Auth 2FA + magic link
 
 ### Issue #20 — [3.4] Sessions Redis + invalidation manuelle
