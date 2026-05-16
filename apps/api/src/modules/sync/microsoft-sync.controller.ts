@@ -7,7 +7,9 @@ import {
   type MicrosoftConnectionStatus,
 } from './microsoft-calendar.service';
 import { MicrosoftPushService } from './microsoft-push.service';
+import { MicrosoftPullService } from './microsoft-pull.service';
 import type { PushResult } from './google-push.service';
+import type { PullResult } from './google-pull.service';
 
 // US-SY-04 — Connexion / état / déconnexion Outlook, scopé à l'utilisateur
 // courant (parité avec le contrôleur Google du Sprint 12).
@@ -17,6 +19,7 @@ export class MicrosoftSyncController {
   constructor(
     private readonly ms: MicrosoftCalendarService,
     private readonly pushSvc: MicrosoftPushService,
+    private readonly pullSvc: MicrosoftPullService,
   ) {}
 
   @Post('connect')
@@ -33,6 +36,18 @@ export class MicrosoftSyncController {
   @Post('push')
   push(@CurrentUser() user: AuthenticatedUser): Promise<PushResult> {
     return this.pushSvc.pushAll(user.id);
+  }
+
+  // US-SY-06 — Réconcilie maintenant Outlook → tâches (déterministe).
+  @Post('pull')
+  pull(@CurrentUser() user: AuthenticatedUser): Promise<PullResult> {
+    return this.pullSvc.pullAll(user.id);
+  }
+
+  // US-SY-06 — (Ré)enregistre la souscription Graph (push notifications).
+  @Post('subscribe')
+  subscribe(@CurrentUser() user: AuthenticatedUser): Promise<{ watching: boolean }> {
+    return this.ms.registerSubscription(user.id);
   }
 
   @Delete()

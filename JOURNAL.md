@@ -5,6 +5,17 @@
 
 ## Sprint 13 — Sync Microsoft Graph
 
+### Issue #70 — [13.3] US-SY-06 Worker pull Outlook + subscriptions webhook
+
+- `MicrosoftPullService` : même logique que le pull Google (delta incrémental, pas de ping-pong via réalignement `pushedHash`, périmètre = events tagués Tasknest) ; spécifique Graph : jeton `@odata.deltaLink` (stocké dans `syncToken`), resync complet sur `deltaExpired`, suppression via **tombstone `@removed`** (le tag absent ⇒ on retrouve la tâche par le mapping `googleEventId`).
+- Souscriptions Graph : `registerSubscription` (TTL 3 jours, `clientState` aléatoire = secret stocké dans `watchResourceId`), gaté `SYNC_MS_WEBHOOK_URL` (best-effort, cron filet sinon).
+- Webhook `POST /integrations/microsoft/webhook` **non authentifié** : (1) **validation** Graph → écho `validationToken` en `text/plain` 200 ; (2) notification → vérifie `clientState` puis pull du compte, 202. `SyncQueue` fait aussi pull MS.
+
+Tests validés (153/153, +6)
+- `TF-SY-06` : maj Outlook→tâche sans aller-retour + idempotent, suppression `@removed`⇒archivage+soft-delete, deltaLink expiré⇒resync sans crash, webhook (validation echo + clientState invalide ignoré + notif valide), subscribe best-effort selon env, 401.
+
+---
+
 ### Issue #69 — [13.2] US-SY-05 Worker push tâches → événements Outlook
 
 - `MicrosoftPushService` : **même algorithme idempotent** que le push Google (`pushedHash`, soft-delete, erreurs isolées par tâche, `lastSyncedAt`), seules les primitives transport changent (Graph `/me/events`, pas de `calendarId`). `PushResult` réutilisé. `SyncEvent.googleEventId` stocke l'id d'event MS (colonne réutilisée, documenté).
