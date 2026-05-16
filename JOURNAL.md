@@ -3,6 +3,21 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 10 — Récurrence
+
+### Issue #54 — [10.1] US-RE-01 Règle RRULE (modèle + lien tâche)
+
+Backend
+- Modèle `RecurrenceRule` (ownerId, `rrule` RFC 5545, endAt) + champs `Task.recurrenceRuleId`/`occurrenceDate`/`recurrenceException` + `@@unique([recurrenceRuleId, occurrenceDate])` (dedupe occurrences). Dep `rrule`. Migration `recurrence_rules`.
+- `PUT /tasks/:id/recurrence {rrule, endAt?}` : valide la RRULE (`RRule.fromString` → 400 si invalide), crée la règle, attache à la tâche modèle (`occurrenceDate` null) ; `DELETE` détache ; `GET /recurrence-rules` liste.
+
+Note infra : **`prisma migrate dev` bloqué non-interactif** dans cet env → migration générée via `prisma migrate diff` + appliquée par `prisma migrate deploy` (consigné en mémoire).
+
+Tests validés (95/95)
+- `TF-RE-01` : RRULE valide attachée/listée/détachée ; RRULE invalide → 400 ; tâche d'un autre → 404.
+
+---
+
 ## Sprint 9 — Vue Timeline / Gantt
 
 ### Issue #50/#51/#52 — [9.1/9.2/9.3] US-VW-07/08 Timeline + édition + visual reg
