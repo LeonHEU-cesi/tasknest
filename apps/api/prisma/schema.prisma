@@ -166,7 +166,9 @@ model List {
   description String?
   // 'list' | 'kanban' | 'calendar' | 'timeline'
   viewDefault String    @default("list") @map("view_default") @db.VarChar(16)
-  position    Int       @default(0)
+  // US-VW-04 — colonnes Kanban personnalisables (statuts ordonnés) par liste.
+  kanbanColumns String[] @default(["todo", "doing", "done", "postponed"]) @map("kanban_columns")
+  position      Int      @default(0)
   archivedAt  DateTime? @map("archived_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")

@@ -5,6 +5,21 @@
 
 ## Sprint 7 — Vue List + Kanban
 
+### Issue #43/#44 — [7.3/7.4] US-VW-03/04 Vue Kanban (DnD + colonnes personnalisables)
+
+Backend
+- `List.kanbanColumns String[]` (défaut `[todo,doing,done,postponed]`), migration `list_kanban_columns` ; `UpdateListDto.kanbanColumns` validé (statuts valides, sans doublon → 400).
+
+Web
+- Page `/kanban?listId=` : colonnes depuis `list.kanbanColumns`, **DnD** d'une carte entre colonnes (`@dnd-kit/core`) ⇒ `PATCH /tasks/:id {status}` (optimiste).
+- Éditeur de colonnes : ajout / suppression / réordonnancement ⇒ `PATCH /lists/:id {kanbanColumns}`.
+
+Tests validés (92/92)
+- e2e API : défaut + personnalisation persistée ; statut invalide/doublon → 400.
+- web typecheck + lint + build verts ; interaction DnD → Playwright #45.
+
+---
+
 ### Issue #41/#42 — [7.1/7.2] US-VW-01/02 Vue Liste (virtual scroll + groupements)
 
 Premier gros sprint front.
