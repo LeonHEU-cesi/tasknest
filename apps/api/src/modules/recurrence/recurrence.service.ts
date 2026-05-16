@@ -57,4 +57,50 @@ export class RecurrenceService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  private async ownedRule(ownerId: string, ruleId: string) {
+    const rule = await this.prisma.recurrenceRule.findFirst({ where: { id: ruleId, ownerId } });
+    if (!rule) throw new NotFoundException('rule-not-found');
+    return rule;
+  }
+
+  // Purge les occurrences futures non-exception (régénérées au prochain run).
+  private async purgeFutureOccurrences(ruleId: string) {
+    await this.prisma.task.deleteMany({
+      where: {
+        recurrenceRuleId: ruleId,
+        occurrenceDate: { not: null, gte: new Date() },
+        recurrenceException: false,
+      },
+    });
+  }
+
+  // US-RE-03 — édition de la série : maj règle + purge des occurrences
+  // futures non-exception (rebâties au prochain run avec la nouvelle règle).
+  async updateRule(
+    ownerId: string,
+    ruleId: string,
+    dto: { rrule?: string; endAt?: string },
+  ) {
+    await this.ownedRule(ownerId, ruleId);
+    if (dto.rrule) RecurrenceService.parseRRule(dto.rrule);
+    const updated = await this.prisma.recurrenceRule.update({
+      where: { id: ruleId },
+      data: {
+        ...(dto.rrule ? { rrule: dto.rrule } : {}),
+        ...(dto.endAt !== undefined ? { endAt: dto.endAt ? new Date(dto.endAt) : null } : {}),
+      },
+    });
+    await this.purgeFutureOccurrences(ruleId);
+    return updated;
+  }
+
+  // US-RE-04 — suppression de la série : purge des occurrences futures
+  // non-exception puis suppression de la règle (les tâches restantes —
+  // modèle, passées, exceptions — voient recurrenceRuleId mis à NULL).
+  async deleteSeries(ownerId: string, ruleId: string) {
+    await this.ownedRule(ownerId, ruleId);
+    await this.purgeFutureOccurrences(ruleId);
+    await this.prisma.recurrenceRule.delete({ where: { id: ruleId } });
+  }
 }

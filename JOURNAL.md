@@ -5,6 +5,20 @@
 
 ## Sprint 10 — Récurrence
 
+### Issue #56/#57 — [10.3/10.4] US-RE-03/04 Édition/suppression instance vs série
+
+Backend
+- **Éditer une occurrence** (`PATCH /tasks/:id`) ⇒ `recurrenceException=true` auto (le générateur ne la régénère/écrase plus).
+- **Supprimer une occurrence** (`DELETE /tasks/:id`) ⇒ archivée **+ exception** (ligne tombstone ⇒ pas de recréation au run suivant).
+- **Éditer la série** : `PATCH /recurrence-rules/:id {rrule?,endAt?}` (RRULE validée) ⇒ purge des occurrences futures non-exception (rebâties au prochain run avec la nouvelle règle).
+- **Supprimer la série** : `DELETE /recurrence-rules/:id` ⇒ purge futur non-exception + suppression règle (FK SetNull : modèle/passées/exceptions deviennent des tâches normales).
+
+Tests validés (102/102)
+- `TF-RE-03` : édition occurrence ⇒ exception ; édition série purge le futur, exception conservée.
+- `TF-RE-04` : suppression occurrence ⇒ tombstone non recréé ; suppression série ⇒ règle + futur supprimés, modèle détaché ; règle d'un autre → 404.
+
+---
+
 ### Issue #55 — [10.2] US-RE-02 Génération d'occurrences (BullMQ, idempotent)
 
 Backend
