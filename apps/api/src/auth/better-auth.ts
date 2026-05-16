@@ -35,6 +35,17 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
 ];
 
+// US-AU-06 — Microsoft Identity Platform v2 : profil + agenda en
+// lecture/écriture + refresh token hors-ligne (sync US-SY-04).
+const MICROSOFT_SCOPES = [
+  'openid',
+  'email',
+  'profile',
+  'offline_access',
+  'User.Read',
+  'Calendars.ReadWrite',
+];
+
 export type BetterAuthInstance = Awaited<ReturnType<typeof createBetterAuth>>;
 
 export async function createBetterAuth(deps: BetterAuthDeps) {
@@ -102,6 +113,19 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
         // Indispensable pour obtenir un refresh_token réutilisable.
         accessType: 'offline',
         prompt: 'select_account consent',
+      },
+      // US-AU-06 — Microsoft 365 / Outlook (mutualise auth + accès agenda).
+      microsoft: {
+        clientId: env('MICROSOFT_CLIENT_ID') ?? '',
+        clientSecret: env('MICROSOFT_CLIENT_SECRET') ?? '',
+        tenantId: env('MICROSOFT_TENANT_ID') ?? 'common',
+        scope: MICROSOFT_SCOPES,
+      },
+      // US-AU-07 — Apple Sign In. L'agenda iCloud n'est PAS accessible par
+      // cette voie (séparé via CalDAV, US-SY-07) : scopes name+email seuls.
+      apple: {
+        clientId: env('APPLE_CLIENT_ID') ?? '',
+        clientSecret: env('APPLE_CLIENT_SECRET') ?? '',
       },
     },
 

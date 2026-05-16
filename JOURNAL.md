@@ -5,6 +5,30 @@
 
 ## Sprint 2 — Auth OAuth
 
+### Issue #14 — [2.3] US-AU-07 OAuth Apple login
+
+Provider Apple ajouté à l'instance Better Auth (scopes `name email` uniquement — l'agenda iCloud n'est PAS accessible par cette voie, séparé via CalDAV au sprint sync US-SY-07). Boutons « Sign in with Apple » sur `/login` et `/signup`.
+
+Tests validés (mocks)
+- `TF-AU-07` : autorisation `appleid.apple.com`, `response_type` hybride `code id_token`, `client_id` présent.
+- `TS-AU-07` : `state` anti-CSRF, aucun `client_secret` dans l'URL.
+
+Note : le `client_secret` Apple réel est un JWT signé (clé privée Apple Developer) — fourni ultérieurement par Léon pour le callback bout-en-bout.
+
+---
+
+### Issue #13 — [2.2] US-AU-06 OAuth Microsoft login
+
+Provider Microsoft (Identity Platform v2) ajouté. Scopes `openid email profile offline_access User.Read **Calendars.ReadWrite**` (mutualise auth + accès agenda pour la sync US-SY-04). `tenantId` configurable (`MICROSOFT_TENANT_ID`, défaut `common`). Boutons « Continue with Microsoft » sur `/login` et `/signup`.
+
+Tests validés (mocks)
+- `TF-AU-06` : autorisation `microsoftonline.com`, `response_type=code`, scopes incluant `Calendars.ReadWrite` + `offline_access`.
+- `TS-AU-06` : PKCE `code_challenge` + `S256`, `state`, pas de `client_secret` en clair.
+
+Liaison automatique multi-provider déjà active (`accountLinking.trustedProviders` posé à l'issue [2.0]). Tokens chiffrés au repos via les mêmes hooks. Total tests API : **27/27**.
+
+---
+
 ### Issue #12 — [2.1] US-AU-05 OAuth Google (web)
 
 Connexion Google par-dessus la fondation Better Auth (provider configuré à l'issue [2.0]).

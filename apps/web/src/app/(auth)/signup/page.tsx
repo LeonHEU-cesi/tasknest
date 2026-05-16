@@ -29,9 +29,9 @@ export default function SignupPage() {
     setStatus('success');
   };
 
-  const handleGoogle = async () => {
+  const handleSocial = async (provider: 'google' | 'microsoft' | 'apple') => {
     setErrorMessage(null);
-    await signIn.social({ provider: 'google', callbackURL });
+    await signIn.social({ provider, callbackURL });
   };
 
   if (status === 'success') {
@@ -50,9 +50,17 @@ export default function SignupPage() {
     <main style={pageStyle}>
       <h1>Create your Tasknest account</h1>
 
-      <button type="button" onClick={handleGoogle} style={buttonStyle}>
-        Continue with Google
-      </button>
+      <div style={socialStyle}>
+        <button type="button" onClick={() => handleSocial('google')} style={buttonStyle}>
+          Continue with Google
+        </button>
+        <button type="button" onClick={() => handleSocial('microsoft')} style={buttonStyle}>
+          Continue with Microsoft
+        </button>
+        <button type="button" onClick={() => handleSocial('apple')} style={buttonStyle}>
+          Sign in with Apple
+        </button>
+      </div>
 
       <p style={{ textAlign: 'center', opacity: 0.6, margin: '1rem 0' }}>or</p>
 
@@ -155,4 +163,10 @@ const buttonStyle = {
 const errorStyle = {
   color: '#c0392b',
   margin: 0,
+} as const;
+
+const socialStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
 } as const;
