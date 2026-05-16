@@ -33,6 +33,15 @@ export class TasksController {
     return this.tasks.create(user.id, listId, dto);
   }
 
+  @Post('tasks/:id/subtasks')
+  createSubtask(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateTaskDto,
+  ) {
+    return this.tasks.createSubtask(user.id, id, dto);
+  }
+
   @Get('lists/:listId/tasks')
   findAll(
     @CurrentUser() user: AuthenticatedUser,

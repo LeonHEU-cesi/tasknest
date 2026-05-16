@@ -3,6 +3,21 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 5 — Tasks hierarchy
+
+### Issue #28/#30 — [5.1/5.3] US-ST-01/03 Sous-tâches + auto-complétion parent
+
+Backend
+- `POST /tasks/:id/subtasks` : crée une tâche enfant (`parentTaskId`, même `listId` que le parent), profondeur illimitée, position auto entre frères.
+- US-ST-03 : quand une sous-tâche passe `done`, si **toutes** les sous-tâches (non archivées) du parent sont `done`, le parent bascule `done` + `completedAt` — **cascade vers le haut** (profondeur illimitée).
+- Réglage utilisateur `autoCompleteSubtasks` (Prisma + Better Auth additionalField, défaut `true`) ; migration `user_autocomplete_subtasks`.
+
+Tests validés (66/66)
+- `TF-ST-01` : sous-tâche rattachée parent + liste.
+- `TF-ST-03` : parent done quand tous les enfants done ; cascade multi-niveaux ; désactivable via le réglage ; isolation cross-user (404).
+
+---
+
 ## Sprint 4 — Tasks core
 
 ### Issue #23-#27 — [4.3-4.7] US-TA-01..04 Tâches core + baseline tests

@@ -32,6 +32,8 @@ model User {
 
   // US-SEC-01 — 2FA TOTP (géré par le plugin Better Auth two-factor).
   twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
+  // US-ST-03 — auto-complétion du parent quand toutes les sous-tâches done.
+  autoCompleteSubtasks Boolean @default(true) @map("auto_complete_subtasks")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
