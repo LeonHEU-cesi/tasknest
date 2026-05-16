@@ -5,12 +5,35 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SubscribePushDto, UnsubscribePushDto } from './dto/subscribe-push.dto';
 import { NotificationPrefsDto } from './dto/notification-prefs.dto';
 import { NotificationsService } from './notifications.service';
+import { NotificationSchedulerService } from './notification-scheduler.service';
 
-// US-NO-01/06 — Abonnement Web Push + préférences notifications.
+// US-NO-01/03/04/06 — Web Push + préférences + rappels/digest (triggers).
 @Controller()
 @UseGuards(AuthGuard)
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(
+    private readonly notifications: NotificationsService,
+    private readonly scheduler: NotificationSchedulerService,
+  ) {}
+
+  // US-NO-03 — génère les rappels à venir de l'utilisateur (le cron système
+  // fait de même pour tous).
+  @Post('notifications/run-reminders')
+  async runReminders(@CurrentUser() user: AuthenticatedUser): Promise<{ created: number }> {
+    return { created: await this.scheduler.generateReminders(new Date(), user.id) };
+  }
+
+  // Dispatch des notifications dues de l'utilisateur (marque envoyées + push).
+  @Post('notifications/dispatch')
+  async dispatch(@CurrentUser() user: AuthenticatedUser): Promise<{ dispatched: number }> {
+    return { dispatched: await this.scheduler.dispatchDue(new Date(), user.id) };
+  }
+
+  // US-NO-04 — digest e-mail du jour pour l'utilisateur (idempotent/jour).
+  @Post('notifications/run-digest')
+  async runDigest(@CurrentUser() user: AuthenticatedUser): Promise<{ sent: number }> {
+    return { sent: await this.scheduler.sendDailyDigest(new Date(), user.id) };
+  }
 
   @Get('push/vapid-public-key')
   vapid() {

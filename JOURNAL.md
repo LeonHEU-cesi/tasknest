@@ -5,6 +5,18 @@
 
 ## Sprint 11 — Notifications
 
+### Issue #60/#61 — [11.3/11.4] US-NO-03/04 Rappels avant échéance + digest
+
+Backend
+- `NotificationSchedulerService` : `generateReminders` (offsets **T-15min/T-1h/T-1j** avant `dueAt`, uniquement à venir, idempotent via unique `(taskId,type,scheduledFor)` + `createMany skipDuplicates`, respecte `notifyReminders`), `dispatchDue` (marque `sentAt` + Web Push si `notifyWebPush`), `sendDailyDigest` (e-mail HTML « du jour + en retard », **idempotent par user/jour**, respecte `notifyDigest`+`notifyEmail`).
+- `MailService.sendDigestEmail`. `NotificationsQueue` BullMQ : crons rappels `*/5 * * * *` + digest `0 8 * * *`, gating `NOTIFICATIONS_WORKER=1` (hors CI/e2e). Endpoints triggers `POST /notifications/run-reminders|dispatch|run-digest` (owner-scoped, déterministes).
+
+Tests validés (110/110)
+- `TF-NO-03` : 2 rappels créés (T-15/T-1h ; T-1j passé exclu), rerun idempotent, dispatch marque envoyés ; aucun si `notifyReminders=false`.
+- `TF-NO-04` : digest envoyé (MailCapture), idempotent le même jour ; 401 sans session.
+
+---
+
 ### Issue #58/#63 — [11.1/11.6] US-NO-01/06 Web Push (VAPID) + préférences
 
 Backend
