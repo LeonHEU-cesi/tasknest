@@ -9,6 +9,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { ListsModule } from './modules/lists/lists.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { TagsModule } from './modules/tags/tags.module';
+import { RecurrenceModule } from './modules/recurrence/recurrence.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TagsModule } from './modules/tags/tags.module';
     ListsModule,
     TasksModule,
     TagsModule,
+    RecurrenceModule,
   ],
 })
 export class AppModule {}

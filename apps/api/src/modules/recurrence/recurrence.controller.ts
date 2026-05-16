@@ -1,0 +1,43 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthGuard } from '../../auth/auth.guard';
+import type { AuthenticatedUser } from '../../auth/auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { SetRecurrenceDto } from './dto/set-recurrence.dto';
+import { RecurrenceService } from './recurrence.service';
+
+// US-RE-01 — Récurrence d'une tâche + liste des règles de l'utilisateur.
+@Controller()
+@UseGuards(AuthGuard)
+export class RecurrenceController {
+  constructor(private readonly recurrence: RecurrenceService) {}
+
+  @Get('recurrence-rules')
+  list(@CurrentUser() user: AuthenticatedUser) {
+    return this.recurrence.listRules(user.id);
+  }
+
+  @Put('tasks/:id/recurrence')
+  set(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetRecurrenceDto,
+  ) {
+    return this.recurrence.setForTask(user.id, id, dto);
+  }
+
+  @Delete('tasks/:id/recurrence')
+  @HttpCode(204)
+  async remove(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    await this.recurrence.removeFromTask(user.id, id);
+  }
+}
