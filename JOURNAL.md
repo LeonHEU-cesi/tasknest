@@ -5,6 +5,20 @@
 
 ## Sprint 8 — Vue Calendar
 
+### Issue #47/#49 — [8.2/8.4] US-VW-06 Création depuis créneau + Playwright
+
+Web
+- Clic sur une cellule jour ⇒ formulaire inline (titre + date de début optionnelle) ⇒ `POST /lists/:listId/tasks { title, dueAt: jour, startAt? }` (start_at..due_at). Clic sur une tâche ne déclenche pas la création (`stopPropagation`).
+- Reload des tâches après création.
+
+Tests validés (#49 volet web)
+- Playwright **4/4** : TF-WEB-VW-05 (calendrier+détail) + **TF-WEB-VW-06** (clic créneau → formulaire → POST avec `title`+`dueAt`) + non-régression List/Kanban.
+
+Périmètre
+- **#48 (parité calendrier mobile) + TM-VW-CAL (Detox)** : reporté, sorti de M8 — l'app mobile est un scaffold sans foundation (dépend de #154). Documenté sur l'issue.
+
+---
+
 ### Issue #46 — [8.1] US-VW-05 Vue Calendrier (mois/semaine/jour)
 
 Web (API tasks/dueAt déjà prête, aucun changement back)

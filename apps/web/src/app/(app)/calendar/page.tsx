@@ -23,7 +23,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { apiGet, apiPatch } from '@/lib/api-client';
+import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import { STATUS_LABELS, type Named, type Task } from '@/lib/api-types';
 
 type CalView = 'month' | 'week' | 'day';
@@ -39,6 +39,9 @@ export default function CalendarPage() {
   const [view, setView] = useState<CalView>('month');
   const [cursor, setCursor] = useState<Date>(new Date());
   const [selected, setSelected] = useState<Task | null>(null);
+  const [creating, setCreating] = useState<string | null>(null);
+  const [newTitle, setNewTitle] = useState('');
+  const [newStart, setNewStart] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -98,6 +101,21 @@ export default function CalendarPage() {
     const dueAt = new Date(`${dayKey}T12:00:00.000Z`).toISOString();
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, dueAt } : t)));
     await apiPatch(`/tasks/${taskId}`, { dueAt });
+  };
+
+  // US-VW-06 — Création depuis un créneau : clic sur un jour ⇒ formulaire
+  // (titre + start optionnel pour définir start_at..due_at).
+  const submitCreate = async () => {
+    if (!listId || !creating || newTitle.trim().length === 0) return;
+    const dueAt = new Date(`${creating}T12:00:00.000Z`).toISOString();
+    const startAt = newStart
+      ? new Date(`${newStart}T12:00:00.000Z`).toISOString()
+      : undefined;
+    await apiPost(`/lists/${listId}/tasks`, { title: newTitle.trim(), dueAt, startAt });
+    setCreating(null);
+    setNewTitle('');
+    setNewStart('');
+    setTasks(await apiGet<Task[]>(`/lists/${listId}/tasks`));
   };
 
   if (error) return <p className="text-red-600">{error}</p>;
@@ -174,6 +192,7 @@ export default function CalendarPage() {
                 dimmed={view === 'month' && !isSameMonth(day, cursor)}
                 tasks={tasksByDay.get(key) ?? []}
                 onSelect={setSelected}
+                onCreate={listId ? setCreating : undefined}
               />
             );
           })}
@@ -199,6 +218,60 @@ export default function CalendarPage() {
           </p>
         </aside>
       ) : null}
+
+      {creating ? (
+        <div
+          data-testid="create-slot"
+          className="fixed left-1/2 top-1/3 w-80 -translate-x-1/2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow"
+        >
+          <h2 className="font-semibold">New task — {creating}</h2>
+          <form
+            className="mt-3 flex flex-col gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitCreate();
+            }}
+          >
+            <input
+              aria-label="New task title"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              required
+              autoFocus
+              className="rounded border border-[var(--color-border)] bg-transparent px-2 py-1"
+            />
+            <label className="text-xs text-[var(--color-muted)]">
+              Start date (optional, sets start_at)
+              <input
+                type="date"
+                aria-label="Start date"
+                value={newStart}
+                onChange={(e) => setNewStart(e.target.value)}
+                className="mt-1 w-full rounded border border-[var(--color-border)] bg-transparent px-2 py-1"
+              />
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="rounded border border-[var(--color-border)] px-3 py-1"
+              >
+                Create
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(null);
+                  setNewTitle('');
+                  setNewStart('');
+                }}
+                className="rounded px-3 py-1 text-[var(--color-muted)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -208,11 +281,13 @@ function DayCell({
   tasks,
   dimmed,
   onSelect,
+  onCreate,
 }: {
   day: Date;
   tasks: Task[];
   dimmed: boolean;
   onSelect: (t: Task) => void;
+  onCreate?: (dayKey: string) => void;
 }) {
   const key = format(day, 'yyyy-MM-dd');
   const { setNodeRef, isOver } = useDroppable({ id: key });
@@ -220,9 +295,12 @@ function DayCell({
     <div
       ref={setNodeRef}
       data-testid={`day-${key}`}
+      onClick={() => onCreate?.(key)}
       className={`min-h-24 bg-[var(--color-surface)] p-1 text-xs ${dimmed ? 'opacity-40' : ''} ${
-        isOver ? 'outline outline-[var(--color-accent)]' : ''
-      } ${isSameDay(day, new Date()) ? 'ring-1 ring-[var(--color-accent)]' : ''}`}
+        onCreate ? 'cursor-pointer' : ''
+      } ${isOver ? 'outline outline-[var(--color-accent)]' : ''} ${
+        isSameDay(day, new Date()) ? 'ring-1 ring-[var(--color-accent)]' : ''
+      }`}
     >
       <div className="mb-1 text-right text-[var(--color-muted)]">{format(day, 'd')}</div>
       <div className="flex flex-col gap-1">
@@ -245,7 +323,10 @@ function TaskChip({ task, onSelect }: { task: Task; onSelect: (t: Task) => void 
       {...attributes}
       type="button"
       data-testid="cal-task"
-      onClick={() => onSelect(task)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(task);
+      }}
       className="truncate rounded bg-[var(--color-accent)]/15 px-1 text-left"
       style={{
         transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
