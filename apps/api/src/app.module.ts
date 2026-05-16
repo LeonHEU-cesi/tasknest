@@ -11,6 +11,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { RecurrenceModule } from './modules/recurrence/recurrence.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SyncModule } from './modules/sync/sync.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     TagsModule,
     RecurrenceModule,
     NotificationsModule,
+    SyncModule,
   ],
 })
 export class AppModule {}

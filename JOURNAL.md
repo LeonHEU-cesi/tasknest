@@ -3,7 +3,61 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
-## Sprint 11 — Notifications
+## Sprint 12 — Sync Google Calendar
+
+### Issue #67 — [12.4] TS-SY-GOOGLE + handling rate-limit
+
+- Refactor `GoogleCalendarHttpTransport` : `call()` unique centralise back-off exponentiel plafonné, `Retry-After` (secondes **ou** date HTTP), détection rejouable (`isRetryableGoogle` : 429/5xx + **403 quota** `rateLimitExceeded`/`backendError`, sinon définitif), 404/410 absorbés (delete/list). `fetch` + `sleep` + `maxRetries`/`baseDelayMs` **injectables** (constructeur, défauts prod inchangés).
+- Token exchange passe aussi par `call()` ⇒ retry sur 429/5xx du endpoint OAuth ; `invalid_grant` (400) reste définitif (reconnexion).
+
+Tests validés (138/138, +10)
+- `TS-SY-GOOGLE` (unit, fetch/sleep mockés, 20 ms) : succès, invalid_grant non rejoué, 429→retry→succès, 5xx persistant ⇒ erreur rejouable après `maxRetries`, `Retry-After` respecté, 403 quota vs 403 simple, 404/410 absorbés, 410 list ⇒ resync, typage `GoogleCalendarError`.
+
+---
+
+### Issue #66 — [12.3] US-SY-03 Worker pull événements Google + webhook watch
+
+Backend
+- `GooglePullService.pullAll(ownerId?)` : liste **incrémentale** via `syncToken` (delta), reprise complète sur 410 (jeton expiré), `nextSyncToken` persisté sur `CalendarAccount`.
+- Réconciliation Google→tâche : event annulé ⇒ tâche **archivée** + mapping soft-deleted ; event modifié ⇒ titre/description/échéance mis à jour, `pushedHash` réaligné pour **aucun ping-pong** push↔pull ; l'écho de nos propres push est détecté inchangé ⇒ skip.
+- **Périmètre volontaire** : seuls les events tagués `tasknestTaskId` (issus de Tasknest) sont reconciliés ; les events externes (réunions…) ne deviennent pas des tâches — documenté, hors US-SY-03.
+- Webhook `POST /integrations/google/webhook` **non authentifié** (Google n'a pas le cookie ; le `channelId` aléatoire = secret partagé), 204 rapide, ignore `state=sync` et canaux inconnus, pull best-effort du bon compte.
+- `registerWatch` (endpoint `POST .../watch`) best-effort gaté par `SYNC_WEBHOOK_URL` ; `SyncQueue` fait désormais push **puis** pull (filet si aucun webhook).
+
+Tests validés (128/128, +6)
+- `TF-SY-03` : maj Google→tâche sans aller-retour + idempotent, suppression⇒archivage+soft-delete, syncToken expiré⇒resync sans crash, webhook (handshake/ canal inconnu/ notif réelle), watch best-effort selon env, 401 sur `/pull`.
+
+---
+
+### Issue #65 — [12.2] US-SY-02 Worker push tâches → événements Google
+
+Backend
+- Modèle `SyncEvent` (mapping tâche↔event, `@@unique(calendarAccountId,taskId)` & `(calendarAccountId,googleEventId)`, `pushedHash`, soft-delete). Migration via workaround.
+- `google-sync.mapper.ts` : `taskToGoogleEvent` (créneau [startAt|dueAt, +estimation], tag `extendedProperties.private.tasknestTaskId`), `taskPushHash` (sha256 stable ⇒ **idempotence**), `isSyncEligible` (dueAt + non archivée + pas un modèle de récurrence pur).
+- `GooglePushService.pushAll(ownerId?)` : insert/patch selon le hash, soft-delete + annulation Google quand la tâche cesse d'être éligible, erreurs Google isolées **par tâche** (une en échec ne bloque pas le lot), `lastSyncedAt` mis à jour.
+- `SyncQueue` BullMQ gating `SYNC_WORKER=1`, cron push `*/10 * * * *` ; endpoint déterministe `POST /integrations/google/push` (owner-scoped).
+
+Tests validés (122/122, +3)
+- `TU-SY-02/TF-SY-02` : rien sans connexion, create→1 event tagué + mapping, re-push idempotent (skip), patch sur changement de titre, tâche sans échéance ignorée, archivage ⇒ event annulé + mapping soft-deleted, re-push stable, 401.
+
+---
+
+### Issue #64 — [12.1] US-SY-01 Connexion compte Google Calendar
+
+Backend
+- Modèle `CalendarAccount` (`@@unique(userId,provider,calendarId)`) qui absorbe l'état de sync (`syncToken`, canal `watch`) — 1:1 avec l'agenda connecté, pas de table `sync_states` séparée. Migration via workaround `migrate diff`.
+- **Pas de second flux OAuth** : le refresh_token chiffré + le scope `calendar` sont déjà acquis au sign-in Google (Sprint 2). « Connecter » = déchiffrer le refresh_token (`TokenCipher` fourni en provider, jamais en lecture transparente), prouver qu'on obtient un access_token (`exchangeRefreshToken`), puis upsert du `CalendarAccount`.
+- Déconnexion = **soft** (`disabledAt`) pour ne pas réémettre d'events à la reconnexion ; reconnexion réactive sans perdre `syncToken`/mappings.
+- `GoogleCalendarTransport` : interface isolant `fetch` (token + events + watch), impl HTTP réelle avec back-off 429/5xx + `Retry-After` ; faux transport en mémoire injecté en e2e (comme `MailCapture`).
+- Endpoints `POST /integrations/google/connect`, `GET .../status`, `DELETE /integrations/google` (AuthGuard, owner-scoped). 409 si Google non lié / scope manquant, 502 si Google injoignable, 409 + désactivation si refresh révoqué.
+
+Web
+- `/settings/integrations` : état + connect/disconnect. `apiDelete` ajouté au client.
+
+Tests validés (119/119, +6)
+- `TF-SY-01` : connect refusé sans compte/scope, connect valide le token (idempotent), status, disconnect soft, reconnexion réactive, refresh révoqué ⇒ 502, 401 sans session. Helpers e2e `linkGoogleAccount` / `currentUserId` / `FakeGoogleCalendar`.
+
+---
 
 ### Issue #62 — [11.5] US-NO-05 Centre de notifications in-app
 
