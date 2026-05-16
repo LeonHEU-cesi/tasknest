@@ -212,6 +212,9 @@ importers:
 
   apps/web:
     dependencies:
+      better-auth:
+        specifier: ^1.6.11
+        version: 1.6.11(@prisma/client@6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3))(next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(prisma@6.19.3(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(vitest@2.1.9(@types/node@20.19.41)(lightningcss@1.27.0)(terser@5.47.1))
       next:
         specifier: ^15.0.0
         version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
