@@ -1,5 +1,5 @@
 import { createAuthClient } from 'better-auth/react';
-import { magicLinkClient } from 'better-auth/client/plugins';
+import { magicLinkClient, twoFactorClient } from 'better-auth/client/plugins';
 
 // US-AU-01..07 — Client Better Auth côté web. baseURL = base d'auth de
 // l'API (le serveur monte le catch-all sur /api/v1/auth). `credentials:
@@ -9,7 +9,7 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').re
 export const authClient = createAuthClient({
   baseURL: `${API_BASE}/api/v1/auth`,
   fetchOptions: { credentials: 'include' },
-  plugins: [magicLinkClient()],
+  plugins: [magicLinkClient(), twoFactorClient()],
 });
 
 export const { signIn, signUp, signOut, useSession, getSession } = authClient;

@@ -60,6 +60,8 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
   const { prismaAdapter } = await import('better-auth/adapters/prisma');
   // US-AU-08 — plugin magic link (ESM-only ⇒ import dynamique comme le reste).
   const { magicLink } = await import('better-auth/plugins/magic-link');
+  // US-SEC-01/02 — plugin 2FA TOTP + codes de récupération.
+  const { twoFactor } = await import('better-auth/plugins/two-factor');
 
   const secret = env('AUTH_SECRET');
   if (!secret) {
@@ -178,6 +180,13 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
         sendMagicLink: async ({ email, url }) => {
           await deps.sendMagicLinkEmail(email, url);
         },
+      }),
+      // US-SEC-01 : activation TOTP (QR via totpURI) + 10 codes de
+      // récupération. US-SEC-02 : le challenge au login est géré par le
+      // plugin (sign-in renvoie un twoFactorRedirect si 2FA actif).
+      twoFactor({
+        issuer: 'Tasknest',
+        backupCodeOptions: { amount: 10 },
       }),
     ],
   });
