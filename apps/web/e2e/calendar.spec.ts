@@ -60,3 +60,30 @@ test('TF-WEB-VW-05 : calendrier mois/semaine/jour + détail', async ({ page }) =
   await page.getByLabel('Calendar view').selectOption('day');
   await expect(page.getByTestId(`day-${todayKey()}`)).toBeVisible();
 });
+
+test('TF-WEB-VW-06 : création depuis un créneau', async ({ page }) => {
+  await mockApi(page);
+  const created: Array<{ url: string; body: unknown }> = [];
+  await page.route('**/api/v1/lists/l1/tasks', async (route) => {
+    if (route.request().method() === 'POST') {
+      created.push({ url: route.request().url(), body: route.request().postDataJSON() });
+      return route.fulfill({ status: 201, contentType: 'application/json', body: '{"id":"new"}' });
+    }
+    return route.fallback();
+  });
+
+  await page.goto('/calendar');
+  await page.getByLabel('Project').selectOption('p1');
+  await page.getByLabel('List').selectOption('l1');
+
+  // Clic sur la cellule du jour ⇒ formulaire de création.
+  await page.getByTestId(`day-${todayKey()}`).click();
+  await expect(page.getByTestId('create-slot')).toBeVisible();
+  await page.getByLabel('New task title').fill('Créée au calendrier');
+  await page.getByRole('button', { name: 'Create' }).click();
+
+  await expect(page.getByTestId('create-slot')).toHaveCount(0);
+  expect(created.length).toBe(1);
+  expect((created[0].body as { title: string }).title).toBe('Créée au calendrier');
+  expect((created[0].body as { dueAt?: string }).dueAt).toContain(todayKey());
+});
