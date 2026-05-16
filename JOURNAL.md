@@ -3,6 +3,25 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 13 — Sync Microsoft Graph
+
+### Issue #68 — [13.1] US-SY-04 Connexion compte Microsoft 365 / Outlook
+
+Clonage de l'ossature Sprint 12 paramétrée `provider='microsoft'` — **aucune migration** (`CalendarAccount`/`SyncEvent` discriminés par `provider`, colonnes réutilisées).
+
+Backend
+- `MicrosoftCalendarTransport` (interface) + `MicrosoftGraphHttpTransport` : `call()` durci (back-off + Retry-After, design identique à Google #67), token endpoint `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`, API Graph `/me/events`, delta `@odata.deltaLink`, subscriptions, tag tâche via `singleValueExtendedProperties`.
+- `microsoft-sync.mapper.ts` : `taskToMicrosoftEvent` (subject/body/start-end Graph) ; **réutilise tels quels** `taskPushHash`/`isSyncEligible` du Sprint 12 (logique provider-neutre, zéro duplication).
+- `MicrosoftCalendarService` connect/status/disconnect/getAccessToken (pas de 2ᵉ flux OAuth : réutilise le refresh_token chiffré + scope `Calendars.ReadWrite` du sign-in MS Sprint 2 ; `TokenCipher` provider partagé). `MicrosoftSyncController` sous `integrations/microsoft`.
+
+Web
+- `/settings/integrations` refactorée en `<IntegrationCard>` réutilisable (Google + Outlook), parité connect/disconnect.
+
+Tests validés (144/144, +6)
+- `TF-SY-04` : refus sans compte/scope, connect valide le token (idempotent), statut, déconnexion, **coexistence Google/Microsoft par provider**, refresh révoqué ⇒ 502, 401. Helper e2e `linkMicrosoftAccount` + `ctx.microsoft` (FakeMicrosoftGraph).
+
+---
+
 ## Sprint 12 — Sync Google Calendar
 
 ### Issue #67 — [12.4] TS-SY-GOOGLE + handling rate-limit
