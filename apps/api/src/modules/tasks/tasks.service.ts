@@ -51,6 +51,42 @@ export class TasksService {
     return task;
   }
 
+  // US-TA-05 — Réordonnancement intra-liste : position = index dans la
+  // liste fournie. Tous les ids doivent appartenir au owner + à la liste.
+  async reorder(ownerId: string, listId: string, orderedIds: string[]) {
+    await this.assertList(ownerId, listId);
+    const tasks = await this.prisma.task.findMany({
+      where: { id: { in: orderedIds }, listId, ownerId },
+      select: { id: true },
+    });
+    if (tasks.length !== orderedIds.length) {
+      throw new NotFoundException('reorder-contains-unknown-task');
+    }
+    await this.prisma.$transaction(
+      orderedIds.map((taskId, index) =>
+        this.prisma.task.update({ where: { id: taskId }, data: { position: index } }),
+      ),
+    );
+    return this.findAllForList(ownerId, listId);
+  }
+
+  // US-TA-06 — Somme des estimations (minutes) d'une liste.
+  async summaryForList(
+    ownerId: string,
+    listId: string,
+  ): Promise<{ count: number; totalEstimatedMinutes: number }> {
+    await this.assertList(ownerId, listId);
+    const agg = await this.prisma.task.aggregate({
+      where: { listId, ownerId, archivedAt: null },
+      _count: true,
+      _sum: { estimatedMinutes: true },
+    });
+    return {
+      count: agg._count,
+      totalEstimatedMinutes: agg._sum.estimatedMinutes ?? 0,
+    };
+  }
+
   async update(ownerId: string, id: string, dto: UpdateTaskDto) {
     const current = await this.findOne(ownerId, id);
 
@@ -74,6 +110,18 @@ export class TasksService {
       } else if (current.status === 'done') {
         data.completedAt = null;
       }
+    }
+
+    // US-TA-05 — Déplacement vers une autre liste (vérif possession cible),
+    // repositionné en fin de liste destination.
+    if (dto.listId && dto.listId !== current.listId) {
+      await this.assertList(ownerId, dto.listId);
+      const last = await this.prisma.task.aggregate({
+        where: { listId: dto.listId },
+        _max: { position: true },
+      });
+      data.list = { connect: { id: dto.listId } };
+      data.position = (last._max.position ?? -1) + 1;
     }
 
     const updated = await this.prisma.task.update({ where: { id }, data });

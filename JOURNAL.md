@@ -5,6 +5,19 @@
 
 ## Sprint 5 — Tasks hierarchy
 
+### Issue #31/#32 — [5.4/5.5] US-TA-05/06 Réordonnancement + estimation
+
+Backend
+- `PATCH /lists/:listId/tasks/reorder` `{ orderedIds }` : `position = index` en transaction ; tous les ids doivent appartenir au owner + à la liste (sinon 404).
+- Déplacement inter-listes : `PATCH /tasks/:id` accepte `listId` (vérif possession liste cible, repositionné en fin).
+- US-TA-06 : `estimatedMinutes` borné 0-9999 (DTO) ; `GET /lists/:listId/tasks/summary` → `{ count, totalEstimatedMinutes }`.
+
+Tests validés (72/72)
+- `TF-TA-05` : reorder applique l'ordre ; id étranger → 404 ; déplacement vers une autre liste.
+- `TF-TA-06` : estimation > 9999 → 400 ; somme par liste correcte.
+
+---
+
 ### Issue #29 — [5.2] US-ST-02 Affichage arborescent des sous-tâches
 
 API
