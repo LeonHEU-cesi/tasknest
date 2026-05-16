@@ -26,3 +26,7 @@ if (root) {
 // Better Auth (nouvelles au Sprint 2). En CI, les valeurs du job priment.
 process.env.AUTH_SECRET ||= 'tasknest-e2e-auth-secret-not-for-prod';
 process.env.TASKNEST_DB_ENCRYPTION_KEY ||= 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
+// Credentials OAuth factices : suffisent pour bâtir l'URL d'autorisation
+// (aucun appel Google). Les vrais seront fournis par Léon.
+process.env.GOOGLE_CLIENT_ID ||= 'tasknest-e2e-google-client-id.apps.googleusercontent.com';
+process.env.GOOGLE_CLIENT_SECRET ||= 'tasknest-e2e-google-client-secret';

@@ -5,6 +5,30 @@
 
 ## Sprint 2 — Auth OAuth
 
+### Issue #12 — [2.1] US-AU-05 OAuth Google (web)
+
+Connexion Google par-dessus la fondation Better Auth (provider configuré à l'issue [2.0]).
+
+Web
+- `lib/auth-client.ts` : client Better Auth React (baseURL `/api/v1/auth`, `credentials: include`).
+- Bouton **« Continue with Google »** sur `/login` ET `/signup` (`signIn.social({ provider: 'google' })`, `callbackURL` = `/settings`).
+- Pages auth entièrement re-backées sur le client : login, signup, verify-email (retour post-redirection), forgot-password (`requestPasswordReset`), reset (`resetPassword(token)`), settings (profil `name`/`image`/`emailVerified`).
+
+Backend
+- Provider Google : scopes `openid email profile` + `calendar` + `access_type=offline` (refresh token pour la sync agenda US-SY-*). Liaison automatique si e-mail déjà existant (`accountLinking`). Tokens chiffrés au repos (hooks `databaseHooks.account` + libsodium).
+
+Tests validés (23/23, mocks — pas de credentials Google réels)
+- `TF-AU-05` : `POST /sign-in/social` → URL d'autorisation Google conforme (`response_type=code`, `client_id`, scopes incluant `calendar`, `access_type=offline`).
+- `TS-AU-05` : PKCE `code_challenge` + `code_challenge_method=S256`, `state` anti-CSRF, pas de `client_secret` dans l'URL, state/PKCE distincts entre deux requêtes.
+- `token-cipher.spec` : round-trip, nonce aléatoire, rejet clé erronée / charge falsifiée / clé non 32 octets.
+- Non-régression Sprint 1 (auth + profil) toujours verte. `typecheck`/`lint` API + `build` web : 0 erreur.
+
+Décisions / périmètre
+- **Mobile PKCE reporté** : l'app Expo est encore un scaffold Sprint 0 sans aucun écran d'auth (le mobile a été différé au Sprint 1). Le flux OAuth mobile (expo-auth-session + Better Auth) nécessite d'abord de scaffolder l'auth mobile → issue de suivi dédiée plutôt que bâcler. Signalé au récap de sprint.
+- Callback Google bout-en-bout (échange de code) testable seulement avec credentials réels (fournis ultérieurement par Léon) ; ici on valide la requête d'autorisation + le chiffrement, conforme à l'approche « mocks ».
+
+---
+
 ### Issue [2.0] — Fondation Better Auth (re-back de l'auth Sprint 1)
 
 Décision structurante validée avec Léon : **Better Auth devient le système d'auth complet** (pas seulement OAuth). L'auth hand-rolled du Sprint 1 est ré-implémentée sur Better Auth, pré-requis aux US-AU-05..07. Périmètre plus large que #12 nominal → traité comme une issue de fondation dédiée.
