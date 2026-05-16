@@ -1,10 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // US-TA-08 — extension Postgres pg_trgm gérée par Prisma.
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
 }
 
 // US-AU-01..07 — Schéma aligné sur Better Auth (système d'auth complet).
@@ -32,6 +35,8 @@ model User {
 
   // US-SEC-01 — 2FA TOTP (géré par le plugin Better Auth two-factor).
   twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
+  // US-ST-03 — auto-complétion du parent quand toutes les sous-tâches done.
+  autoCompleteSubtasks Boolean @default(true) @map("auto_complete_subtasks")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -39,9 +44,10 @@ model User {
   sessions   Session[]
   accounts   Account[]
   twoFactors TwoFactor[]
-  projects   Project[]
-  lists      List[]
-  tasks      Task[]
+  projects      Project[]
+  lists         List[]
+  tasks         Task[]   @relation("TaskOwner")
+  assignedTasks Task[]   @relation("TaskAssignee")
 
   @@index([deletedAt])
   @@map("users")
@@ -179,6 +185,9 @@ model Task {
   listId           String    @map("list_id") @db.Uuid
   parentTaskId     String?   @map("parent_task_id") @db.Uuid
   ownerId          String    @map("owner_id") @db.Uuid
+  // US-TA-07 — assignation (prep partage : dropdown membres + notif aux
+  // sprints sharing/notif). SetNull si l'assigné est supprimé.
+  assignedTo       String?   @map("assigned_to") @db.Uuid
   title            String    @db.VarChar(240)
   description      String?
   // 'todo' | 'doing' | 'done' | 'postponed' | 'canceled'
@@ -197,11 +206,16 @@ model Task {
   children Task[] @relation("Subtasks")
   parent   Task?  @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   list     List   @relation(fields: [listId], references: [id], onDelete: Cascade)
-  owner    User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner    User   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  assignee User?  @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
 
   @@index([listId])
   @@index([ownerId, status])
   @@index([ownerId, dueAt])
   @@index([parentTaskId])
+  @@index([assignedTo])
+  // US-TA-08 — recherche full-text trigram (accélère ILIKE).
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("tasks")
 }

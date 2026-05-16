@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Max,
   Min,
@@ -44,10 +45,16 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(9999)
   estimatedMinutes?: number;
 
   @IsOptional()
   @IsInt()
   @Min(0)
   position?: number;
+
+  // US-TA-05 — Déplacement vers une autre liste (DnD inter-listes).
+  @IsOptional()
+  @IsUUID('4')
+  listId?: string;
 }

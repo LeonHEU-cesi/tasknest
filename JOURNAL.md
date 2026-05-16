@@ -3,6 +3,75 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 5 — Tasks hierarchy
+
+### Issue #34 — [5.7] US-TA-08 Recherche full-text (pg_trgm)
+
+Backend
+- Datasource Prisma : extension `pg_trgm` (`previewFeatures postgresqlExtensions`).
+- Index **GIN trigram** sur `tasks.title` et `tasks.description` (`gin_trgm_ops`) — migration `task_trgm_search` (crée l'extension + les index).
+- `GET /tasks/search?q=` : ILIKE sur title/description (accéléré par les index), scopé propriétaire, hors archivées, top 50 par `updatedAt`.
+
+Tests validés (78/78)
+- `TF-TA-08` : retrouve par titre et description, insensible casse/accents ; requête vide → `[]`.
+- `TS` : ne renvoie que les tâches du propriétaire ; 401 sans session.
+
+---
+
+### Issue #33 — [5.6] US-TA-07 Assignation d'une tâche
+
+Backend
+- Schéma : `Task.assignedTo` (FK user, `SetNull`), relations nommées `TaskOwner`/`TaskAssignee` (User : `tasks`/`assignedTasks`). Migration `task_assigned_to`.
+- `PATCH /tasks/:id/assignee {assignedTo}` (vérif assigné = compte existant non supprimé → 404 sinon) ; `DELETE /tasks/:id/assignee` (désassignation).
+- Dropdown membres de projet + notif au destinataire = sprints sharing (S16) / notifs (S11) — colonne posée en prep.
+
+Tests validés (74/74)
+- `TF-TA-07` : assigner → `assignedTo` renseigné ; désassigner → null.
+- `TS-TA-07` : assigné inexistant → 404.
+
+---
+
+### Issue #31/#32 — [5.4/5.5] US-TA-05/06 Réordonnancement + estimation
+
+Backend
+- `PATCH /lists/:listId/tasks/reorder` `{ orderedIds }` : `position = index` en transaction ; tous les ids doivent appartenir au owner + à la liste (sinon 404).
+- Déplacement inter-listes : `PATCH /tasks/:id` accepte `listId` (vérif possession liste cible, repositionné en fin).
+- US-TA-06 : `estimatedMinutes` borné 0-9999 (DTO) ; `GET /lists/:listId/tasks/summary` → `{ count, totalEstimatedMinutes }`.
+
+Tests validés (72/72)
+- `TF-TA-05` : reorder applique l'ordre ; id étranger → 404 ; déplacement vers une autre liste.
+- `TF-TA-06` : estimation > 9999 → 400 ; somme par liste correcte.
+
+---
+
+### Issue #29 — [5.2] US-ST-02 Affichage arborescent des sous-tâches
+
+API
+- `GET /tasks/:id/subtasks` (enfants directs, owner-scoped) et `GET /tasks/:id/progress` (`{done,total}`).
+
+Web
+- Composant récursif réutilisable `components/task-tree.tsx` : nœud expandable/collapsable, badge progression `done/total`, barré si done.
+- Page minimale `/tasks` (projet → liste → arbre) exerçant le composant.
+
+Tests validés (68/68)
+- `TF-ST-02` (API) : subtasks renvoie les enfants ; progress compte les done (0/3 → 1/3) ; isolation cross-user 404.
+- Test d'interaction web = Playwright → **différé** (pas d'infra Playwright ; la List/Kanban View polie + son test arrivent au **Sprint 7**). Composant prêt à y être intégré.
+
+---
+
+### Issue #28/#30 — [5.1/5.3] US-ST-01/03 Sous-tâches + auto-complétion parent
+
+Backend
+- `POST /tasks/:id/subtasks` : crée une tâche enfant (`parentTaskId`, même `listId` que le parent), profondeur illimitée, position auto entre frères.
+- US-ST-03 : quand une sous-tâche passe `done`, si **toutes** les sous-tâches (non archivées) du parent sont `done`, le parent bascule `done` + `completedAt` — **cascade vers le haut** (profondeur illimitée).
+- Réglage utilisateur `autoCompleteSubtasks` (Prisma + Better Auth additionalField, défaut `true`) ; migration `user_autocomplete_subtasks`.
+
+Tests validés (66/66)
+- `TF-ST-01` : sous-tâche rattachée parent + liste.
+- `TF-ST-03` : parent done quand tous les enfants done ; cascade multi-niveaux ; désactivable via le réglage ; isolation cross-user (404).
+
+---
+
 ## Sprint 4 — Tasks core
 
 ### Issue #23-#27 — [4.3-4.7] US-TA-01..04 Tâches core + baseline tests
