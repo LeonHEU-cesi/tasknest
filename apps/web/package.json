@@ -16,6 +16,7 @@
     "clean": "rimraf .next coverage .turbo"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.24",
     "better-auth": "^1.6.11",
     "next": "^15.0.0",
     "qrcode": "^1.5.4",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^20.17.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
@@ -31,7 +33,9 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
+    "postcss": "^8.5.14",
     "rimraf": "^6.0.1",
+    "tailwindcss": "^4.3.0",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^2.1.0"

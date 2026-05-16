@@ -1,3 +1,15 @@
+@import 'tailwindcss';
+
+/* Sprint 7 — passage de styles inline à Tailwind v4 (CSS-first).
+   Thème minimal ; shadcn/ui complet pourra s'y greffer plus tard. */
+@theme {
+  --color-surface: #ffffff;
+  --color-ink: #111827;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-accent: #3366ff;
+}
+
 :root {
   color-scheme: light dark;
 }
@@ -9,6 +21,7 @@ body {
 }
 
 body {
-  background: Canvas;
-  color: CanvasText;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: system-ui, sans-serif;
 }

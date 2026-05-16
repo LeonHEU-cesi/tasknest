@@ -3,6 +3,23 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 7 — Vue List + Kanban
+
+### Issue #41/#42 — [7.1/7.2] US-VW-01/02 Vue Liste (virtual scroll + groupements)
+
+Premier gros sprint front.
+
+Web
+- **Tailwind v4** (CSS-first, `@tailwindcss/postcss`, thème minimal dans `globals.css`) — fin des styles inline.
+- Coquille `(app)/layout.tsx` : barre latérale (Tasks/Settings/Security) + zone principale.
+- Vue Liste `/tasks` : sélecteurs projet/liste, **virtual scroll** (`@tanstack/react-virtual`, gère >200 items), **groupements** collapsables (statut/priorité/tag) via lignes header+task aplaties, badges tags, lien vers Kanban.
+- `lib/api-types.ts` (types partagés vues).
+
+Tests validés
+- web typecheck + lint + build verts (Tailwind compilé). Tests d'interaction Playwright → issue #45 (infra montée en fin de sprint).
+
+---
+
 ## Sprint 6 — Tags, priorités, filtres
 
 ### Issue #37-#40 — [6.3-6.6] US-TG-03/04 + US-TA-09/10 Filtres + tri
