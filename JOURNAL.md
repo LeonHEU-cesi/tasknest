@@ -3,6 +3,23 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 11 — Notifications
+
+### Issue #58/#63 — [11.1/11.6] US-NO-01/06 Web Push (VAPID) + préférences
+
+Backend
+- Modèles `Notification` (MLD : type/channel/payload/scheduledFor/sentAt/readAt, unique `(taskId,type,scheduledFor)`) + `PushSubscription` (endpoint unique) + 4 prefs booléennes sur `User` (`notify*`) + better-auth additionalFields. Migration `notifications` (diff+deploy).
+- `web-push` : clés VAPID depuis l'env, **générées à la volée** si absentes (dev/test). Endpoints `GET /push/vapid-public-key`, `POST/DELETE /push/subscribe` (upsert idempotent), `GET/PATCH /me/notification-prefs`. `pushToUser()` (best-effort, nettoie les abonnements 404/410) prêt pour les rappels.
+
+Web
+- `public/sw.js` (service worker : `push` → showNotification, `notificationclick` → focus/open).
+- Page `/settings/notifications` : toggles préférences + bouton « Enable web push » (register SW + subscribe + POST).
+
+Tests validés (106/106)
+- `TF-NO-01` : clé VAPID exposée ; subscribe idempotent (upsert) ; unsubscribe ; `TF-NO-06` : prefs défaut + toggles ; 401 sans session. web tc/lint/build verts.
+
+---
+
 ## Sprint 10 — Récurrence
 
 ### Issue #56/#57 — [10.3/10.4] US-RE-03/04 Édition/suppression instance vs série

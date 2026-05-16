@@ -169,6 +169,10 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
           defaultValue: true,
           input: false,
         },
+        notifyReminders: { type: 'boolean', required: false, defaultValue: true, input: false },
+        notifyDigest: { type: 'boolean', required: false, defaultValue: true, input: false },
+        notifyWebPush: { type: 'boolean', required: false, defaultValue: true, input: false },
+        notifyEmail: { type: 'boolean', required: false, defaultValue: true, input: false },
       },
     },
 
