@@ -110,6 +110,28 @@ export class TasksService {
     });
   }
 
+  // US-ST-02 — Enfants directs (pour l'affichage arborescent).
+  async getSubtasks(ownerId: string, parentId: string) {
+    await this.findOne(ownerId, parentId);
+    return this.prisma.task.findMany({
+      where: { parentTaskId: parentId, ownerId, archivedAt: null },
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  // US-ST-02 — Indicateur de progression « x/y sous-tâches done ».
+  async getProgress(ownerId: string, id: string): Promise<{ done: number; total: number }> {
+    await this.findOne(ownerId, id);
+    const children = await this.prisma.task.findMany({
+      where: { parentTaskId: id, archivedAt: null },
+      select: { status: true },
+    });
+    return {
+      total: children.length,
+      done: children.filter((child) => child.status === 'done').length,
+    };
+  }
+
   private async maybeCompleteParents(ownerId: string, parentTaskId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: ownerId },

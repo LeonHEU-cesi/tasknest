@@ -55,6 +55,16 @@ export class TasksController {
     return this.tasks.findOne(user.id, id);
   }
 
+  @Get('tasks/:id/subtasks')
+  subtasks(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.tasks.getSubtasks(user.id, id);
+  }
+
+  @Get('tasks/:id/progress')
+  progress(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.tasks.getProgress(user.id, id);
+  }
+
   @Patch('tasks/:id')
   update(
     @CurrentUser() user: AuthenticatedUser,
