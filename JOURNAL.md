@@ -5,6 +5,28 @@
 
 ## Sprint 3 — Auth 2FA + magic link
 
+### Issue #18 — [3.2] US-SEC-01 2FA TOTP + codes de récupération
+
+Activation de la double authentification via le plugin Better Auth `two-factor`.
+
+Backend
+- Plugin `twoFactor({ issuer: 'Tasknest', backupCodeOptions: { amount: 10 } })`.
+- Schéma Prisma : `User.twoFactorEnabled` + modèle `TwoFactor` (`secret`, `backupCodes`, `userId`, **`verified`** — champ exigé par le plugin, oublié au 1er jet → `PrismaClientValidationError` corrigée). Migrations `two_factor` + `two_factor_verified`.
+
+Web
+- `auth-client.ts` : plugin `twoFactorClient`.
+- Page `/security` : confirmation mot de passe → `twoFactor.enable` → **QR code** (lib `qrcode`, rendu data-URI) + **10 codes de récupération** affichés → saisie du code à 6 chiffres → `verifyTotp` active la 2FA.
+
+Tests validés (41/41)
+- `TF-SEC-01` : `enable` → `totpURI` + 10 backup codes ; code TOTP valide (généré via `otpauth` depuis le secret) → `twoFactorEnabled = true`.
+- `TS-SEC-01` : `enable` sans session refusé ; code TOTP invalide refusé.
+
+Décisions
+- `otpauth` (et non `otplib`) pour générer les TOTP en test : mieux typé sous NodeNext.
+- Commentaire `eslint-disable @next/next/no-img-element` retiré (règle non configurée — plugin Next absent ; `<img>` data-URI accepté).
+
+---
+
 ### Issue #17 — [3.1] US-AU-08 Magic link / OTP par e-mail
 
 Connexion sans mot de passe par lien e-mail, via le plugin Better Auth `magic-link` (fondation [2.0] prête).
