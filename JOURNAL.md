@@ -5,6 +5,16 @@
 
 ## Sprint 13 — Sync Microsoft Graph
 
+### Issue #69 — [13.2] US-SY-05 Worker push tâches → événements Outlook
+
+- `MicrosoftPushService` : **même algorithme idempotent** que le push Google (`pushedHash`, soft-delete, erreurs isolées par tâche, `lastSyncedAt`), seules les primitives transport changent (Graph `/me/events`, pas de `calendarId`). `PushResult` réutilisé. `SyncEvent.googleEventId` stocke l'id d'event MS (colonne réutilisée, documenté).
+- Endpoint déterministe `POST /integrations/microsoft/push` ; `SyncQueue` pousse aussi MS dans le job `*/10 min` (gating `SYNC_WORKER=1` inchangé).
+
+Tests validés (147/147, +3)
+- `TF-SY-05` : rien sans connexion, create⇒1 event Graph **tagué** (`singleValueExtendedProperties`) + mapping, re-push idempotent (skip), patch sur changement de titre, tâche sans échéance ignorée, archivage ⇒ event supprimé (tombstone `@removed`) + mapping soft-deleted, re-push stable, 401.
+
+---
+
 ### Issue #68 — [13.1] US-SY-04 Connexion compte Microsoft 365 / Outlook
 
 Clonage de l'ossature Sprint 12 paramétrée `provider='microsoft'` — **aucune migration** (`CalendarAccount`/`SyncEvent` discriminés par `provider`, colonnes réutilisées).

@@ -6,13 +6,18 @@ import {
   MicrosoftCalendarService,
   type MicrosoftConnectionStatus,
 } from './microsoft-calendar.service';
+import { MicrosoftPushService } from './microsoft-push.service';
+import type { PushResult } from './google-push.service';
 
 // US-SY-04 — Connexion / état / déconnexion Outlook, scopé à l'utilisateur
 // courant (parité avec le contrôleur Google du Sprint 12).
 @Controller('integrations/microsoft')
 @UseGuards(AuthGuard)
 export class MicrosoftSyncController {
-  constructor(private readonly ms: MicrosoftCalendarService) {}
+  constructor(
+    private readonly ms: MicrosoftCalendarService,
+    private readonly pushSvc: MicrosoftPushService,
+  ) {}
 
   @Post('connect')
   connect(@CurrentUser() user: AuthenticatedUser): Promise<MicrosoftConnectionStatus> {
@@ -22,6 +27,12 @@ export class MicrosoftSyncController {
   @Get('status')
   status(@CurrentUser() user: AuthenticatedUser): Promise<MicrosoftConnectionStatus> {
     return this.ms.status(user.id);
+  }
+
+  // US-SY-05 — Pousse maintenant les tâches vers Outlook (déterministe).
+  @Post('push')
+  push(@CurrentUser() user: AuthenticatedUser): Promise<PushResult> {
+    return this.pushSvc.pushAll(user.id);
   }
 
   @Delete()
