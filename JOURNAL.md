@@ -5,6 +5,21 @@
 
 ## Sprint 5 — Tasks hierarchy
 
+### Issue #29 — [5.2] US-ST-02 Affichage arborescent des sous-tâches
+
+API
+- `GET /tasks/:id/subtasks` (enfants directs, owner-scoped) et `GET /tasks/:id/progress` (`{done,total}`).
+
+Web
+- Composant récursif réutilisable `components/task-tree.tsx` : nœud expandable/collapsable, badge progression `done/total`, barré si done.
+- Page minimale `/tasks` (projet → liste → arbre) exerçant le composant.
+
+Tests validés (68/68)
+- `TF-ST-02` (API) : subtasks renvoie les enfants ; progress compte les done (0/3 → 1/3) ; isolation cross-user 404.
+- Test d'interaction web = Playwright → **différé** (pas d'infra Playwright ; la List/Kanban View polie + son test arrivent au **Sprint 7**). Composant prêt à y être intégré.
+
+---
+
 ### Issue #28/#30 — [5.1/5.3] US-ST-01/03 Sous-tâches + auto-complétion parent
 
 Backend
