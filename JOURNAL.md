@@ -5,6 +5,19 @@
 
 ## Sprint 12 — Sync Google Calendar
 
+### Issue #65 — [12.2] US-SY-02 Worker push tâches → événements Google
+
+Backend
+- Modèle `SyncEvent` (mapping tâche↔event, `@@unique(calendarAccountId,taskId)` & `(calendarAccountId,googleEventId)`, `pushedHash`, soft-delete). Migration via workaround.
+- `google-sync.mapper.ts` : `taskToGoogleEvent` (créneau [startAt|dueAt, +estimation], tag `extendedProperties.private.tasknestTaskId`), `taskPushHash` (sha256 stable ⇒ **idempotence**), `isSyncEligible` (dueAt + non archivée + pas un modèle de récurrence pur).
+- `GooglePushService.pushAll(ownerId?)` : insert/patch selon le hash, soft-delete + annulation Google quand la tâche cesse d'être éligible, erreurs Google isolées **par tâche** (une en échec ne bloque pas le lot), `lastSyncedAt` mis à jour.
+- `SyncQueue` BullMQ gating `SYNC_WORKER=1`, cron push `*/10 * * * *` ; endpoint déterministe `POST /integrations/google/push` (owner-scoped).
+
+Tests validés (122/122, +3)
+- `TU-SY-02/TF-SY-02` : rien sans connexion, create→1 event tagué + mapping, re-push idempotent (skip), patch sur changement de titre, tâche sans échéance ignorée, archivage ⇒ event annulé + mapping soft-deleted, re-push stable, 401.
+
+---
+
 ### Issue #64 — [12.1] US-SY-01 Connexion compte Google Calendar
 
 Backend

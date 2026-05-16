@@ -230,6 +230,7 @@ model Task {
   taskTags       TaskTag[]
   recurrenceRule RecurrenceRule? @relation(fields: [recurrenceRuleId], references: [id], onDelete: SetNull)
   notifications  Notification[]
+  syncEvents     SyncEvent[]
 
   @@unique([recurrenceRuleId, occurrenceDate])
   @@index([listId])
@@ -356,9 +357,37 @@ model CalendarAccount {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncEvents SyncEvent[]
 
   @@unique([userId, provider, calendarId])
   @@index([userId])
   @@map("calendar_accounts")
+}
+
+// US-SY-02/03 — Mapping bidirectionnel tâche ↔ événement Google. `pushedHash`
+// = empreinte du dernier état poussé : un re-push qui ne change rien est un
+// no-op (idempotent). Soft-delete (`deletedAt`) plutôt que suppression : on
+// garde la trace pour ne pas recréer un event sur une tâche redevenue
+// éligible par erreur, et pour réconcilier les suppressions venues de Google.
+model SyncEvent {
+  id                String @id @default(uuid()) @db.Uuid
+  calendarAccountId String @map("calendar_account_id") @db.Uuid
+  taskId            String @map("task_id") @db.Uuid
+  googleEventId     String @map("google_event_id")
+
+  etag       String?
+  pushedHash String?   @map("pushed_hash")
+  deletedAt  DateTime? @map("deleted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  calendarAccount CalendarAccount @relation(fields: [calendarAccountId], references: [id], onDelete: Cascade)
+  task            Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarAccountId, taskId])
+  @@unique([calendarAccountId, googleEventId])
+  @@index([taskId])
+  @@map("sync_events")
 }
