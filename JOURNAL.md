@@ -5,6 +5,19 @@
 
 ## Sprint 5 — Tasks hierarchy
 
+### Issue #34 — [5.7] US-TA-08 Recherche full-text (pg_trgm)
+
+Backend
+- Datasource Prisma : extension `pg_trgm` (`previewFeatures postgresqlExtensions`).
+- Index **GIN trigram** sur `tasks.title` et `tasks.description` (`gin_trgm_ops`) — migration `task_trgm_search` (crée l'extension + les index).
+- `GET /tasks/search?q=` : ILIKE sur title/description (accéléré par les index), scopé propriétaire, hors archivées, top 50 par `updatedAt`.
+
+Tests validés (78/78)
+- `TF-TA-08` : retrouve par titre et description, insensible casse/accents ; requête vide → `[]`.
+- `TS` : ne renvoie que les tâches du propriétaire ; 401 sans session.
+
+---
+
 ### Issue #33 — [5.6] US-TA-07 Assignation d'une tâche
 
 Backend

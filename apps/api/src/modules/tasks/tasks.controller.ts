@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -67,6 +68,12 @@ export class TasksController {
     @Body() dto: ReorderTasksDto,
   ) {
     return this.tasks.reorder(user.id, listId, dto.orderedIds);
+  }
+
+  // Doit précéder `tasks/:id` (sinon "search" matché comme :id).
+  @Get('tasks/search')
+  search(@CurrentUser() user: AuthenticatedUser, @Query('q') q?: string) {
+    return this.tasks.search(user.id, q ?? '');
   }
 
   @Get('tasks/:id')
