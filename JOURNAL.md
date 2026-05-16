@@ -3,6 +3,24 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 4 — Tasks core
+
+### Issue #21 — [4.1] US-PR-01 CRUD projets
+
+Premier module produit. Modèles Prisma `Project`/`List`/`Task` posés ensemble (migration `tasks_core`) ; cette issue livre le CRUD projets.
+
+Backend
+- Schéma : `projects`/`lists`/`tasks` (MLD), `Task.parentTaskId` self-relation (sous-tâches Sprint 5), relations `User.projects/lists/tasks`. Migration `20260516085242_tasks_core`.
+- `ProjectsModule` (CRUD), protégé `@UseGuards(AuthGuard)`, **scopé propriétaire** (`@CurrentUser().id`) : un utilisateur ne voit/modifie jamais les projets d'un autre.
+- `DELETE` = soft-delete (`archivedAt`), `GET ?includeArchived=true` pour les revoir.
+- `ParseUUIDPipe` sur les params id.
+
+Tests validés (52/52)
+- `TF-PR-01` : create→list→get, validation `name` (400), update, soft-delete (absent par défaut, présent avec includeArchived).
+- `TS` : 401 sans session ; **isolation** — un projet d'Alice renvoie 404 pour Bob (get + patch).
+
+---
+
 ## Sprint 3 — Auth 2FA + magic link
 
 ### Issue #20 — [3.4] Sessions Redis + invalidation manuelle
