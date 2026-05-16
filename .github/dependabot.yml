@@ -3,16 +3,30 @@ updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: "06:00"
       timezone: Europe/Paris
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels:
       - "type-chore"
       - "scope-config"
     commit-message:
       prefix: "chore(deps)"
+    # React et ses types sont volontairement épinglés via pnpm.overrides
+    # (cohérence stricte avec la version imposée par Expo). On bloque donc
+    # les bumps mineurs/majeurs ; seuls les patchs de react/react-dom passent
+    # (sécurité). Les @types/* React n'ont pas d'avis de sécurité : ignore total.
+    ignore:
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-dom"
+      - dependency-name: "react"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
+      - dependency-name: "react-dom"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
     groups:
       typescript-tooling:
         patterns:
@@ -25,29 +39,44 @@ updates:
           - "prettier"
           - "vitest"
           - "@vitest/*"
+      expo-react-native:
+        patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+          - "react-native"
+          - "react-native-*"
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: "06:00"
       timezone: Europe/Paris
+    open-pull-requests-limit: 5
     labels:
       - "type-chore"
       - "scope-ci"
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: "/"
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: "06:00"
       timezone: Europe/Paris
+    open-pull-requests-limit: 5
     labels:
       - "type-chore"
       - "scope-config"
     commit-message:
       prefix: "chore(docker)"
+    groups:
+      docker:
+        patterns:
+          - "*"
