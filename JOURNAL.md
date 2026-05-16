@@ -3,6 +3,34 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 2 — Auth OAuth
+
+### Issue [2.0] — Fondation Better Auth (re-back de l'auth Sprint 1)
+
+Décision structurante validée avec Léon : **Better Auth devient le système d'auth complet** (pas seulement OAuth). L'auth hand-rolled du Sprint 1 est ré-implémentée sur Better Auth, pré-requis aux US-AU-05..07. Périmètre plus large que #12 nominal → traité comme une issue de fondation dédiée.
+
+Backend
+- **Schéma Prisma remodelé** sur Better Auth : `User`/`Session`/`Account`/`Verification` (remplace `email_verifications`/`password_resets`/`sessions` custom). Migration fraîche `better_auth_foundation` (projet pré-alpha, reset de dev assumé).
+- **`src/auth/better-auth.ts`** : fabrique async (import dynamique — better-auth est ESM-only), `emailAndPassword` avec **argon2id** (parité Sprint 1), provider Google (scopes `profile email calendar offline`), `accountLinking`, `additionalFields` (locale/timezone/isAdmin/suspendedAt/deletedAt), hooks de chiffrement des tokens OAuth.
+- **`src/common/crypto/token-cipher.ts`** : libsodium `secretbox` (clé `TASKNEST_DB_ENCRYPTION_KEY`, 32 octets) pour chiffrer access/refresh/id tokens au repos.
+- **`AuthModule` (@Global)** : provider async de l'instance ; **`AuthGuard`** basé sur la session Better Auth (remplace `SessionAuthGuard`) ; token d'injection isolé (`auth.tokens.ts`) pour casser le cycle module ↔ guard.
+- **`bootstrap.ts`** : configuration HTTP partagée prod/e2e — catch-all Better Auth (`toNodeHandler`) monté **avant** les body parsers, `/api/v1/auth/*`.
+- **`users.*`** recâblés sur le nouveau schéma (`name`/`image`/`emailVerified`).
+- Suppression de l'auth hand-rolled Sprint 1 (auth.service/controller/session.service/dto + session-auth.guard).
+
+Tests validés
+- **13/13 e2e verts** : non-régression complète signup / vérification e-mail / login+session / reset password (`auth.e2e-spec.ts`) + profil `/me` (`users.profile.e2e-spec.ts`) + health, tous via les endpoints Better Auth réels contre Postgres.
+- Helper e2e mutualisé (`test/utils/e2e-app.ts`) : app Better Auth réelle, capture des e-mails, helpers signup/verify/login.
+- `typecheck` (NodeNext) et `lint` API : 0 erreur.
+
+Décisions
+- **`apps/api` passé en `module/moduleResolution: NodeNext`** : seule façon propre de résoudre un paquet ESM-only (`exports`/`.d.mts`) tout en gardant `import()` dynamique en sortie CommonJS NestJS.
+- **Tokens OAuth chiffrés à l'écriture** via `databaseHooks.account` ; déchiffrement explicite côté consommateurs (sync agenda), jamais en lecture transparente.
+- **Dépendances déclarées** : `express` ajouté en dépendance directe (importé dans le bootstrap — était transitif), `dotenv` en devDep (setup e2e). Même principe que le fix `@eslint/js`.
+- `ci-api.yml` : `TASKNEST_DB_ENCRYPTION_KEY` corrigé en clé 32 octets valide (l'ancienne valeur faisait 35 octets).
+
+---
+
 ## Sprint 1 — Auth basique
 
 ### Issue #11 — [1.5] US-US-01 Profile read/edit

@@ -1,119 +1,75 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import cookieParser from 'cookie-parser';
-import { hash } from '@node-rs/argon2';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/db/prisma.service';
-import { MailService } from '../src/modules/mail/mail.service';
+import { createE2EApp, resetDb, signupAndVerify, login, type E2EContext } from './utils/e2e-app';
 
+// US-US-01 — Profil /me protégé par la session Better Auth. Non-régression
+// du Sprint 1 sur le nouveau schéma (name/image/emailVerified).
 describe('GET/PATCH /api/v1/me (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
+  let ctx: E2EContext;
+  const bob = { email: 'bob@tasknest.local', password: 'Bobsecret1234', name: 'Bob' };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(MailService)
-      .useValue({
-        sendVerificationEmail: async () => undefined,
-        sendPasswordResetEmail: async () => undefined,
-        sendPasswordChangedEmail: async () => undefined,
-      })
-      .compile();
-
-    app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api/v1');
-    app.use(cookieParser());
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-    );
-    await app.init();
-    prisma = app.get(PrismaService);
+    ctx = await createE2EApp();
   });
 
   afterAll(async () => {
-    await app.close();
+    await ctx.app.close();
   });
 
   beforeEach(async () => {
-    await prisma.session.deleteMany();
-    await prisma.passwordReset.deleteMany();
-    await prisma.emailVerification.deleteMany();
-    await prisma.user.deleteMany();
+    await resetDb(ctx.prisma);
+    ctx.mail.verifications.clear();
   });
 
-  async function loginAndGetCookie(): Promise<string> {
-    await prisma.user.create({
-      data: {
-        email: 'me@tasknest.local',
-        passwordHash: await hash('Aliceprod1234'),
-        displayName: 'Alice',
-        emailVerifiedAt: new Date(),
-      },
-    });
-    const loginRes = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({ email: 'me@tasknest.local', password: 'Aliceprod1234' });
-    const setCookie = loginRes.headers['set-cookie'];
-    const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
-    return cookies.find((c: string) => c.startsWith('tasknest_session='))!;
-  }
+  const server = () => ctx.app.getHttpServer();
 
-  it('GET /me without cookie returns 401', async () => {
-    await request(app.getHttpServer()).get('/api/v1/me').expect(401);
+  it('401 sans session', async () => {
+    await request(server()).get('/api/v1/me').expect(401);
   });
 
-  it('GET /me with valid cookie returns the profile', async () => {
-    const cookie = await loginAndGetCookie();
+  it('200 avec session, sans fuite de secret', async () => {
+    await signupAndVerify(ctx, bob);
+    const cookie = await login(ctx, bob.email, bob.password);
 
-    const response = await request(app.getHttpServer())
-      .get('/api/v1/me')
-      .set('Cookie', cookie)
-      .expect(200);
-
-    expect(response.body.email).toBe('me@tasknest.local');
-    expect(response.body.displayName).toBe('Alice');
-    expect(response.body.locale).toBe('fr');
-    expect(response.body.emailVerifiedAt).not.toBeNull();
-    expect(response.body.passwordHash).toBeUndefined();
+    const res = await request(server()).get('/api/v1/me').set('Cookie', cookie).expect(200);
+    expect(res.body.email).toBe(bob.email);
+    expect(res.body.name).toBe('Bob');
+    expect(res.body.emailVerified).toBe(true);
+    expect(res.body.password).toBeUndefined();
+    expect(res.body.passwordHash).toBeUndefined();
+    expect(res.body.isAdmin).toBeUndefined();
   });
 
-  it('PATCH /me updates display name, locale and timezone', async () => {
-    const cookie = await loginAndGetCookie();
+  it('PATCH met à jour name + locale + timezone', async () => {
+    await signupAndVerify(ctx, bob);
+    const cookie = await login(ctx, bob.email, bob.password);
 
-    const response = await request(app.getHttpServer())
+    const res = await request(server())
       .patch('/api/v1/me')
       .set('Cookie', cookie)
-      .send({ displayName: 'Léon', locale: 'en', timezone: 'Europe/Berlin' })
+      .send({ name: 'Bobby', locale: 'en', timezone: 'America/New_York' })
       .expect(200);
+    expect(res.body.name).toBe('Bobby');
+    expect(res.body.locale).toBe('en');
+    expect(res.body.timezone).toBe('America/New_York');
 
-    expect(response.body.displayName).toBe('Léon');
-    expect(response.body.locale).toBe('en');
-    expect(response.body.timezone).toBe('Europe/Berlin');
-
-    const stored = await prisma.user.findUnique({ where: { email: 'me@tasknest.local' } });
-    expect(stored?.displayName).toBe('Léon');
+    const stored = await ctx.prisma.user.findUnique({ where: { email: bob.email } });
+    expect(stored?.name).toBe('Bobby');
     expect(stored?.locale).toBe('en');
-    expect(stored?.timezone).toBe('Europe/Berlin');
   });
 
-  it('PATCH /me rejects invalid locale with 400', async () => {
-    const cookie = await loginAndGetCookie();
+  it('PATCH locale invalide → 400', async () => {
+    await signupAndVerify(ctx, bob);
+    const cookie = await login(ctx, bob.email, bob.password);
 
-    await request(app.getHttpServer())
+    await request(server())
       .patch('/api/v1/me')
       .set('Cookie', cookie)
-      .send({ locale: 'klingon' })
+      .send({ locale: 'es' })
       .expect(400);
   });
 
-  it('PATCH /me without cookie returns 401', async () => {
-    await request(app.getHttpServer())
-      .patch('/api/v1/me')
-      .send({ displayName: 'Anonymous' })
-      .expect(401);
+  it('PATCH sans session → 401', async () => {
+    await request(server()).patch('/api/v1/me').send({ name: 'X' }).expect(401);
   });
 });
