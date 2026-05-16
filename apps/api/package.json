@@ -29,7 +29,7 @@
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@node-rs/argon2": "^2.0.2",
-    "@prisma/client": "^6.0.0",
+    "@prisma/client": "^7.8.0",
     "better-auth": "^1.6.11",
     "bullmq": "^5.76.8",
     "class-transformer": "^0.5.1",
