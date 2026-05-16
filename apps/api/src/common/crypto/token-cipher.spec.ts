@@ -53,4 +53,38 @@ describe('TokenCipher', () => {
     expect(sealed).not.toBeNull();
     expect(cipher.decryptNullable(sealed)).toBe('x');
   });
+
+  // #15 — preuve que le hook Better Auth ne persiste jamais un token en clair.
+  it('sealAccountTokens chiffre access/refresh/id et laisse le reste intact', () => {
+    const account = {
+      providerId: 'google',
+      accountId: 'sub-123',
+      scope: 'openid email',
+      accessToken: 'ya29.access',
+      refreshToken: '1//refresh',
+      idToken: 'eyJ.id.token',
+    };
+    const sealed = cipher.sealAccountTokens(account);
+
+    expect(sealed.providerId).toBe('google');
+    expect(sealed.accountId).toBe('sub-123');
+    expect(sealed.scope).toBe('openid email');
+
+    expect(sealed.accessToken).not.toBe(account.accessToken);
+    expect(sealed.refreshToken).not.toBe(account.refreshToken);
+    expect(sealed.idToken).not.toBe(account.idToken);
+
+    expect(cipher.decrypt(sealed.accessToken as string)).toBe('ya29.access');
+    expect(cipher.decrypt(sealed.refreshToken as string)).toBe('1//refresh');
+    expect(cipher.decrypt(sealed.idToken as string)).toBe('eyJ.id.token');
+  });
+
+  it('sealAccountTokens : compte sans token (provider credential) non altéré', () => {
+    const credential = { providerId: 'credential', accountId: 'u1', password: 'argon2-hash' };
+    const sealed = cipher.sealAccountTokens(credential);
+    expect(sealed.password).toBe('argon2-hash');
+    expect(sealed.accessToken).toBeNull();
+    expect(sealed.refreshToken).toBeNull();
+    expect(sealed.idToken).toBeNull();
+  });
 });

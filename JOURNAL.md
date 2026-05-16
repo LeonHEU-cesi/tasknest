@@ -5,6 +5,30 @@
 
 ## Sprint 2 — Auth OAuth
 
+### Issue #16 — [2.5] TS-AU-* suite de tests sécurité OAuth
+
+Suite de sécurité consolidée (`security.ts-au.e2e-spec.ts`) :
+- Cookie de session `tasknest.session_token` : `HttpOnly` + `SameSite` vérifiés.
+- Non-fuite : `get-session` et `/me` ne renvoient ni mot de passe ni tokens.
+- Callback OAuth (`/callback/google`) sans `state` ⇒ aucune session créée, statut ≠ 200 (anti-CSRF).
+- Tokens OAuth chiffrés au repos : insertion via `sealAccountTokens` puis lecture en base — colonnes illisibles, déchiffrables uniquement avec la clé.
+- Rappel : PKCE S256 + `state` + scopes déjà couverts par `TF/TS-AU-05/06/07`.
+
+Total tests API : **34/34** (8 fichiers).
+
+---
+
+### Issue #15 — [2.4] Stockage chiffré des tokens OAuth en base
+
+Durcissement et preuve du chiffrement introduit à l'issue [2.0].
+- Logique de scellement extraite en méthode pure testable `TokenCipher.sealAccountTokens()` (chiffre `accessToken`/`refreshToken`/`idToken`, laisse `providerId`/`scope`/`password` intacts).
+- Hooks Better Auth `databaseHooks.account.create|update.before` recâblés sur cette méthode.
+- Tests unitaires dédiés : champs chiffrés vs intacts, compte `credential` sans token non altéré, round-trip.
+
+Décision : déchiffrement **explicite** côté consommateurs (sync agenda, sprints US-SY-*), jamais en lecture transparente — limite la surface d'exposition du clair. Rotation de clé : prévue via ré-encodage hors-ligne quand `TASKNEST_DB_ENCRYPTION_KEY` changera (documenté, non requis tant qu'aucune donnée prod).
+
+---
+
 ### Issue #14 — [2.3] US-AU-07 OAuth Apple login
 
 Provider Apple ajouté à l'instance Better Auth (scopes `name email` uniquement — l'agenda iCloud n'est PAS accessible par cette voie, séparé via CalDAV au sprint sync US-SY-07). Boutons « Sign in with Apple » sur `/login` et `/signup`.

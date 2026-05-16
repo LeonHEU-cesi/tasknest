@@ -70,12 +70,6 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
   // les hooks d'écriture du compte ; le déchiffrement se fera explicitement
   // côté consommateurs (sync agenda), jamais en lecture transparente.
   const cipher = await TokenCipher.create(env('TASKNEST_DB_ENCRYPTION_KEY'));
-  const encryptAccountTokens = <T extends Record<string, unknown>>(account: T): T => ({
-    ...account,
-    accessToken: cipher.encryptNullable(account.accessToken as string | null | undefined),
-    refreshToken: cipher.encryptNullable(account.refreshToken as string | null | undefined),
-    idToken: cipher.encryptNullable(account.idToken as string | null | undefined),
-  });
 
   return betterAuth({
     secret,
@@ -164,10 +158,10 @@ export async function createBetterAuth(deps: BetterAuthDeps) {
     databaseHooks: {
       account: {
         create: {
-          before: async (account) => ({ data: encryptAccountTokens(account) }),
+          before: async (account) => ({ data: cipher.sealAccountTokens(account) }),
         },
         update: {
-          before: async (account) => ({ data: encryptAccountTokens(account) }),
+          before: async (account) => ({ data: cipher.sealAccountTokens(account) }),
         },
       },
     },
