@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { NotificationBell } from '@/components/notification-bell';
 
 // Sprint 7 — Coquille de l'app authentifiée : barre latérale + zone
 // principale. Styles Tailwind (fin des styles inline).
@@ -28,7 +29,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </Link>
         </nav>
       </aside>
-      <main className="min-w-0 flex-1 p-6">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-12 items-center justify-end border-b border-[var(--color-border)] px-6">
+          <NotificationBell />
+        </header>
+        <main className="min-w-0 flex-1 p-6">{children}</main>
+      </div>
     </div>
   );
 }

@@ -5,6 +5,23 @@
 
 ## Sprint 11 — Notifications
 
+### Issue #62 — [11.5] US-NO-05 Centre de notifications in-app
+
+Backend
+- `GET /notifications` (paginé curseur `before` + `limit`, **compteur non-lus**), `PATCH /notifications/:id/read`, `POST /notifications/read-all` — owner-scoped, ne renvoie que les notifs matérialisées (`sentAt` non null).
+
+Web
+- `components/notification-bell.tsx` : cloche header avec compteur non-lus (poll 60s), lien `/notifications`. Intégrée au header de la coquille `(app)`.
+- Page `/notifications` : liste + « mark read » / « mark all read ».
+
+Tests validés (113/113)
+- `TF-NO-05` : liste + unreadCount, mark-read décrémente, read-all → 0, pagination `limit`, 401 sans session. Playwright 6/6 (non-régression vues, cloche n'altère rien).
+
+Périmètre
+- **#59 (push Expo mobile) reporté hors M11** — app mobile sans foundation (dépend #154).
+
+---
+
 ### Issue #60/#61 — [11.3/11.4] US-NO-03/04 Rappels avant échéance + digest
 
 Backend

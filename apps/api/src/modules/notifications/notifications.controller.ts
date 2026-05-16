@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import type { AuthenticatedUser } from '../../auth/auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -33,6 +45,30 @@ export class NotificationsController {
   @Post('notifications/run-digest')
   async runDigest(@CurrentUser() user: AuthenticatedUser): Promise<{ sent: number }> {
     return { sent: await this.scheduler.sendDailyDigest(new Date(), user.id) };
+  }
+
+  // US-NO-05 — Centre de notifications in-app.
+  @Get('notifications')
+  list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('limit') limit?: string,
+    @Query('before') before?: string,
+  ) {
+    return this.notifications.list(user.id, limit ? Number(limit) : 20, before);
+  }
+
+  @Patch('notifications/:id/read')
+  @HttpCode(204)
+  async markRead(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.notifications.markRead(user.id, id);
+  }
+
+  @Post('notifications/read-all')
+  markAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.notifications.markAllRead(user.id);
   }
 
   @Get('push/vapid-public-key')
