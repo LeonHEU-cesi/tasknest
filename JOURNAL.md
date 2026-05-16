@@ -5,6 +5,18 @@
 
 ## Sprint 6 — Tags, priorités, filtres
 
+### Issue #36 — [6.2] US-TG-02 Assignation tags ↔ tâche (M2M)
+
+Backend
+- Modèle join `TaskTag` (`@@id([taskId,tagId])`, cascade des deux côtés). Migration `task_tags`.
+- `PUT /tasks/:id/tags { tagIds }` : remplace l'ensemble (idempotent, transaction) ; tous les tagIds doivent appartenir au owner (sinon 404).
+- Lectures de tâches : tags exposés à plat (`tags: Tag[]`).
+
+Tests validés (85/85)
+- `TF-TG-02` : set/replace/clear ; tags inclus dans la liste ; tag d'un autre → 404.
+
+---
+
 ### Issue #35 — [6.1] US-TG-01 CRUD tags
 
 `TagsModule` : tags par utilisateur (nom + couleur).
