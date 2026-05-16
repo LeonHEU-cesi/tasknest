@@ -3,14 +3,22 @@ import { AuthGuard } from '../../auth/auth.guard';
 import type { AuthenticatedUser } from '../../auth/auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CaldavService, type CaldavConnectionStatus } from './caldav.service';
+import { CaldavPushService } from './caldav-push.service';
+import { CaldavPullService } from './caldav-pull.service';
 import { ConnectCaldavDto } from './dto/connect-caldav.dto';
+import type { PushResult } from './google-push.service';
+import type { PullResult } from './google-pull.service';
 
 // US-SY-07 — Connexion / état / déconnexion CalDAV (iCloud, Nextcloud,
 // Samsung, générique). Scopé à l'utilisateur courant (AuthGuard).
 @Controller('integrations/caldav')
 @UseGuards(AuthGuard)
 export class CaldavSyncController {
-  constructor(private readonly caldav: CaldavService) {}
+  constructor(
+    private readonly caldav: CaldavService,
+    private readonly pushSvc: CaldavPushService,
+    private readonly pullSvc: CaldavPullService,
+  ) {}
 
   @Post('connect')
   connect(
@@ -23,6 +31,17 @@ export class CaldavSyncController {
   @Get('status')
   status(@CurrentUser() user: AuthenticatedUser): Promise<CaldavConnectionStatus> {
     return this.caldav.status(user.id);
+  }
+
+  // US-SY-08 — push / pull déterministes (le cron fait de même pour tous).
+  @Post('push')
+  push(@CurrentUser() user: AuthenticatedUser): Promise<PushResult> {
+    return this.pushSvc.pushAll(user.id);
+  }
+
+  @Post('pull')
+  pull(@CurrentUser() user: AuthenticatedUser): Promise<PullResult> {
+    return this.pullSvc.pullAll(user.id);
   }
 
   @Delete()

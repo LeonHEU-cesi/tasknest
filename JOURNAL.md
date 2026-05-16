@@ -5,6 +5,18 @@
 
 ## Sprint 14 — Sync Apple CalDAV
 
+### Issue #73 — [14.2] US-SY-08 Worker push/pull CalDAV iCloud
+
+- `caldav-ical.mapper.ts` : sérialiseur/parseur **iCalendar minimal** (RFC 5545 — échappement, dépliage des lignes, UID stable `tasknest-<id>@tasknest` + `X-TASKNEST-TASK-ID`), pas de dépendance lourde. Réexporte `taskPushHash`/`isSyncEligible`.
+- `CaldavPushService` : même algo idempotent que Google/MS, un objet = un `.ics` (href = `SyncEvent.googleEventId`), concurrence ETag (If-Match / If-None-Match), soft-delete.
+- `CaldavPullService` : delta `sync-collection` **+ repli ETag** (`listEtags` quand le serveur ne supporte pas REPORT — base US-SY-09), suppression ⇒ archivage, pas de ping-pong. **Comparaison à la précision seconde** (iCalendar n'a pas les ms) pour ne pas confondre l'écho de notre push avec une vraie modification.
+- Endpoints `POST /integrations/caldav/{push,pull}` ; `SyncQueue` étendu push+pull CalDAV.
+
+Tests validés (172/172, +3)
+- `TF-SY-08` : push crée `.ics` tagué + idempotent + maj + suppression ; pull maj serveur→tâche sans aller-retour + suppression⇒archivage. 401.
+
+---
+
 ### Issue #72 — [14.1] US-SY-07 Connexion compte CalDAV (URL + user + app-password)
 
 Modèle **différent** des providers OAuth (pas de flux OAuth, pas de webhook).

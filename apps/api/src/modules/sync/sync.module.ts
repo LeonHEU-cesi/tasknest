@@ -12,6 +12,8 @@ import { MicrosoftSyncController } from './microsoft-sync.controller';
 import { SyncWebhookController } from './sync-webhook.controller';
 import { MicrosoftWebhookController } from './microsoft-webhook.controller';
 import { CaldavService } from './caldav.service';
+import { CaldavPushService } from './caldav-push.service';
+import { CaldavPullService } from './caldav-pull.service';
 import { CaldavSyncController } from './caldav-sync.controller';
 import { CALDAV_TRANSPORT, CaldavHttpTransport } from './caldav.transport';
 import { SyncQueue } from './sync-queue';
@@ -45,6 +47,8 @@ import {
     MicrosoftPushService,
     MicrosoftPullService,
     CaldavService,
+    CaldavPushService,
+    CaldavPullService,
     SyncQueue,
     {
       provide: TokenCipher,
@@ -84,6 +88,8 @@ import {
     MicrosoftPushService,
     MicrosoftPullService,
     CaldavService,
+    CaldavPushService,
+    CaldavPullService,
   ],
 })
 export class SyncModule {}
