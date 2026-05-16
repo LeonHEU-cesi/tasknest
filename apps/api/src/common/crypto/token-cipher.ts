@@ -62,4 +62,19 @@ export class TokenCipher {
   decryptNullable(payload: string | null | undefined): string | null {
     return payload == null ? null : this.decrypt(payload);
   }
+
+  // US-AU-05 / #15 — Scelle les champs token d'un compte OAuth avant
+  // persistance (hook Better Auth). Seuls access/refresh/id token sont
+  // chiffrés ; les autres champs (providerId, scope…) passent inchangés.
+  // Fonction pure et testable isolément (preuve du chiffrement au repos).
+  sealAccountTokens<T extends Record<string, unknown>>(
+    account: T,
+  ): T & { accessToken: string | null; refreshToken: string | null; idToken: string | null } {
+    return {
+      ...account,
+      accessToken: this.encryptNullable(account.accessToken as string | null | undefined),
+      refreshToken: this.encryptNullable(account.refreshToken as string | null | undefined),
+      idToken: this.encryptNullable(account.idToken as string | null | undefined),
+    };
+  }
 }
