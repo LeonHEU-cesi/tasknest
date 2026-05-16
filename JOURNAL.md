@@ -3,6 +3,22 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 6 — Tags, priorités, filtres
+
+### Issue #35 — [6.1] US-TG-01 CRUD tags
+
+`TagsModule` : tags par utilisateur (nom + couleur).
+
+Backend
+- Modèle `Tag` (ownerId, name, color), `@@unique([ownerId, name])`. Migration `tags`.
+- CRUD owner-scoped ; conflit de nom (P2002) → **409** ; même nom autorisé pour deux users distincts.
+
+Tests validés (82/82)
+- `TF-TG-01` : create→list→update→delete ; doublon nom → 409 ; même nom OK pour 2 users.
+- `TS` : tag d'un autre → 404 ; 401 sans session.
+
+---
+
 ## Sprint 5 — Tasks hierarchy
 
 ### Issue #34 — [5.7] US-TA-08 Recherche full-text (pg_trgm)
