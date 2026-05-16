@@ -24,6 +24,9 @@ if (root) {
 
 // Secrets de test si absents : le .env local n'a pas forcément les clés
 // Better Auth (nouvelles au Sprint 2). En CI, les valeurs du job priment.
+// Le .env pointe Redis sur le hostname docker (`redis:6379`), injoignable
+// depuis l'hôte/CI où tournent les tests : on force localhost (port mappé).
+process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.AUTH_SECRET ||= 'tasknest-e2e-auth-secret-not-for-prod';
 process.env.TASKNEST_DB_ENCRYPTION_KEY ||= 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
 // Credentials OAuth factices : suffisent pour bâtir l'URL d'autorisation
