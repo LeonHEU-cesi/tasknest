@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   UseGuards,
@@ -14,6 +15,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import type { AuthenticatedUser } from '../../auth/auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SetRecurrenceDto } from './dto/set-recurrence.dto';
+import { UpdateRecurrenceDto } from './dto/update-recurrence.dto';
 import { RecurrenceService } from './recurrence.service';
 import { RecurrenceGenerationService } from './recurrence-generation.service';
 
@@ -36,6 +38,26 @@ export class RecurrenceController {
   @Get('recurrence-rules')
   list(@CurrentUser() user: AuthenticatedUser) {
     return this.recurrence.listRules(user.id);
+  }
+
+  // US-RE-03 — éditer la série.
+  @Patch('recurrence-rules/:id')
+  updateRule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateRecurrenceDto,
+  ) {
+    return this.recurrence.updateRule(user.id, id, dto);
+  }
+
+  // US-RE-04 — supprimer la série.
+  @Delete('recurrence-rules/:id')
+  @HttpCode(204)
+  async deleteSeries(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.recurrence.deleteSeries(user.id, id);
   }
 
   @Put('tasks/:id/recurrence')

@@ -183,6 +183,12 @@ export class TasksService {
       data.position = (last._max.position ?? -1) + 1;
     }
 
+    // US-RE-03 — éditer une occurrence générée la transforme en exception
+    // (le générateur ne la régénère/écrase plus).
+    if (current.occurrenceDate && current.recurrenceRuleId) {
+      data.recurrenceException = true;
+    }
+
     const updated = await this.prisma.task.update({ where: { id }, data });
 
     // US-ST-03 : si une sous-tâche passe à done, compléter le parent quand
@@ -308,9 +314,15 @@ export class TasksService {
   }
 
   // US-TA-04 — Soft-delete (archive) + restauration tant que non purgée.
+  // US-RE-04 — supprimer une occurrence : on l'archive ET on la marque
+  // exception (la ligne reste en tombstone ⇒ le générateur ne la recrée pas).
   async archive(ownerId: string, id: string) {
-    await this.findOne(ownerId, id);
-    return this.prisma.task.update({ where: { id }, data: { archivedAt: new Date() } });
+    const current = await this.findOne(ownerId, id);
+    const isOccurrence = Boolean(current.occurrenceDate && current.recurrenceRuleId);
+    return this.prisma.task.update({
+      where: { id },
+      data: { archivedAt: new Date(), ...(isOccurrence ? { recurrenceException: true } : {}) },
+    });
   }
 
   async restore(ownerId: string, id: string) {
