@@ -20,6 +20,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { ReorderTasksDto } from './dto/reorder-tasks.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
 import { SetTaskTagsDto } from './dto/set-task-tags.dto';
+import { FilterTasksDto } from './dto/filter-tasks.dto';
 import { TasksService } from './tasks.service';
 
 // US-TA-01..04 — Tâches : création/lecture sous la liste, édition/statut/
@@ -51,8 +52,9 @@ export class TasksController {
   findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Param('listId', ParseUUIDPipe) listId: string,
+    @Query() filter: FilterTasksDto,
   ) {
-    return this.tasks.findAllForList(user.id, listId);
+    return this.tasks.findAllForList(user.id, listId, filter);
   }
 
   @Get('lists/:listId/tasks/summary')

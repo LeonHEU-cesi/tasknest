@@ -5,6 +5,18 @@
 
 ## Sprint 6 — Tags, priorités, filtres
 
+### Issue #37-#40 — [6.3-6.6] US-TG-03/04 + US-TA-09/10 Filtres + tri
+
+Backend
+- Query params sur `GET /lists/:listId/tasks` via `FilterTasksDto` : `status`, `tagId`, `priority` (0-3), `dueBefore`/`dueAfter` (ISO), `sort` (`manual`|`due`|`priority`|`created`). Tous **combinables** (AND).
+- `sort` : `manual` = position (défaut) ; `due`/`priority`/`created` = tri dédié.
+- Validation stricte (priorité bornée, sort énuméré) → 400.
+
+Tests validés (90/90)
+- `TF-TG-03` filtre tag · `TF-TG-04` filtre priorité · `TF-TA-09` combinés (statut+priorité, fenêtre due) · `TF-TA-10` tri (priority/due) · query invalide → 400.
+
+---
+
 ### Issue #36 — [6.2] US-TG-02 Assignation tags ↔ tâche (M2M)
 
 Backend

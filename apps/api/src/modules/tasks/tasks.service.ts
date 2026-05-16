@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../db/prisma.service';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
+import type { FilterTasksDto } from './dto/filter-tasks.dto';
 
 // US-TA-01..04 — Tâches scopées au propriétaire ; chaque opération vérifie
 // la possession de la liste / de la tâche.
@@ -45,11 +46,37 @@ export class TasksService {
     return { ...rest, tags: (taskTags ?? []).map((tt) => tt.tag) };
   }
 
-  async findAllForList(ownerId: string, listId: string) {
+  // US-TA-09/10, US-TG-03/04 — Filtres combinables (statut, tag, priorité,
+  // fenêtre due_at) + tri configurable.
+  async findAllForList(ownerId: string, listId: string, filter: FilterTasksDto = {}) {
     await this.assertList(ownerId, listId);
+
+    const due: Prisma.DateTimeNullableFilter = {};
+    if (filter.dueAfter) due.gte = new Date(filter.dueAfter);
+    if (filter.dueBefore) due.lte = new Date(filter.dueBefore);
+
+    const where: Prisma.TaskWhereInput = {
+      listId,
+      ownerId,
+      archivedAt: null,
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.priority !== undefined ? { priority: filter.priority } : {}),
+      ...(filter.tagId ? { taskTags: { some: { tagId: filter.tagId } } } : {}),
+      ...(due.gte || due.lte ? { dueAt: due } : {}),
+    };
+
+    const orderBy: Prisma.TaskOrderByWithRelationInput[] =
+      filter.sort === 'due'
+        ? [{ dueAt: 'asc' }]
+        : filter.sort === 'priority'
+          ? [{ priority: 'asc' }]
+          : filter.sort === 'created'
+            ? [{ createdAt: 'desc' }]
+            : [{ position: 'asc' }, { createdAt: 'asc' }];
+
     const tasks = await this.prisma.task.findMany({
-      where: { listId, ownerId, archivedAt: null },
-      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      where,
+      orderBy,
       include: TasksService.TAG_INCLUDE,
     });
     return tasks.map((task) => this.withTags(task));
