@@ -206,9 +206,10 @@ model Task {
 
   children Task[] @relation("Subtasks")
   parent   Task?  @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  list     List   @relation(fields: [listId], references: [id], onDelete: Cascade)
-  owner    User   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  assignee User?  @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  list     List      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  owner    User      @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  assignee User?     @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  taskTags TaskTag[]
 
   @@index([listId])
   @@index([ownerId, status])
@@ -230,9 +231,23 @@ model Tag {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner    User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  taskTags TaskTag[]
 
   @@unique([ownerId, name])
   @@index([ownerId])
   @@map("tags")
+}
+
+// US-TG-02 — Association M2M tâche ↔ tag (suppression en cascade des deux côtés).
+model TaskTag {
+  taskId String @map("task_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@index([tagId])
+  @@map("task_tags")
 }

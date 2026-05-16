@@ -37,18 +37,31 @@ export class TasksService {
     });
   }
 
+  // US-TG-02 — Tags exposés à plat (`tags: Tag[]`) dans les lectures.
+  private static readonly TAG_INCLUDE = { taskTags: { include: { tag: true } } } as const;
+
+  private withTags<T extends { taskTags?: { tag: unknown }[] }>(task: T) {
+    const { taskTags, ...rest } = task;
+    return { ...rest, tags: (taskTags ?? []).map((tt) => tt.tag) };
+  }
+
   async findAllForList(ownerId: string, listId: string) {
     await this.assertList(ownerId, listId);
-    return this.prisma.task.findMany({
+    const tasks = await this.prisma.task.findMany({
       where: { listId, ownerId, archivedAt: null },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      include: TasksService.TAG_INCLUDE,
     });
+    return tasks.map((task) => this.withTags(task));
   }
 
   async findOne(ownerId: string, id: string) {
-    const task = await this.prisma.task.findFirst({ where: { id, ownerId } });
+    const task = await this.prisma.task.findFirst({
+      where: { id, ownerId },
+      include: TasksService.TAG_INCLUDE,
+    });
     if (!task) throw new NotFoundException('task-not-found');
-    return task;
+    return this.withTags(task);
   }
 
   // US-TA-08 — Recherche full-text sur title/description (ILIKE accéléré
@@ -245,6 +258,26 @@ export class TasksService {
   async unassign(ownerId: string, id: string) {
     await this.findOne(ownerId, id);
     return this.prisma.task.update({ where: { id }, data: { assignedTo: null } });
+  }
+
+  // US-TG-02 — Remplace l'ensemble des tags d'une tâche (idempotent).
+  // Tous les tagIds doivent appartenir au propriétaire.
+  async setTags(ownerId: string, taskId: string, tagIds: string[]) {
+    await this.findOne(ownerId, taskId);
+    const uniqueIds = [...new Set(tagIds)];
+    if (uniqueIds.length > 0) {
+      const owned = await this.prisma.tag.count({
+        where: { id: { in: uniqueIds }, ownerId },
+      });
+      if (owned !== uniqueIds.length) throw new NotFoundException('tag-not-found');
+    }
+    await this.prisma.$transaction([
+      this.prisma.taskTag.deleteMany({ where: { taskId } }),
+      this.prisma.taskTag.createMany({
+        data: uniqueIds.map((tagId) => ({ taskId, tagId })),
+      }),
+    ]);
+    return this.findOne(ownerId, taskId);
   }
 
   // US-TA-04 — Soft-delete (archive) + restauration tant que non purgée.

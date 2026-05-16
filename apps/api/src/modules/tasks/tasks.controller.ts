@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { ReorderTasksDto } from './dto/reorder-tasks.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
+import { SetTaskTagsDto } from './dto/set-task-tags.dto';
 import { TasksService } from './tasks.service';
 
 // US-TA-01..04 — Tâches : création/lecture sous la liste, édition/statut/
@@ -113,6 +115,15 @@ export class TasksController {
   @HttpCode(204)
   async unassign(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     await this.tasks.unassign(user.id, id);
+  }
+
+  @Put('tasks/:id/tags')
+  setTags(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetTaskTagsDto,
+  ) {
+    return this.tasks.setTags(user.id, id, dto.tagIds);
   }
 
   @Post('tasks/:id/restore')
