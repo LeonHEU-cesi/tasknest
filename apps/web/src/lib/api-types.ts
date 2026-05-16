@@ -18,6 +18,7 @@ export interface Task {
   status: TaskStatus;
   priority: number;
   dueAt: string | null;
+  startAt: string | null;
   parentTaskId: string | null;
   position: number;
   tags: Tag[];
