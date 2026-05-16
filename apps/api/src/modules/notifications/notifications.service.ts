@@ -75,6 +75,39 @@ export class NotificationsService implements OnModuleInit {
     return this.getPrefs(userId);
   }
 
+  // US-NO-05 — Centre in-app : liste paginée (curseur createdAt) + compteur
+  // non-lus. Seules les notifications "matérialisées" (sentAt non null).
+  async list(userId: string, limit = 20, before?: string) {
+    const items = await this.prisma.notification.findMany({
+      where: {
+        userId,
+        sentAt: { not: null },
+        ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 100),
+    });
+    const unreadCount = await this.prisma.notification.count({
+      where: { userId, sentAt: { not: null }, readAt: null },
+    });
+    return { items, unreadCount };
+  }
+
+  async markRead(userId: string, id: string): Promise<void> {
+    await this.prisma.notification.updateMany({
+      where: { id, userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
+
+  async markAllRead(userId: string): Promise<{ updated: number }> {
+    const res = await this.prisma.notification.updateMany({
+      where: { userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { updated: res.count };
+  }
+
   // Envoi best-effort à tous les abonnements Web Push de l'utilisateur
   // (réutilisé par les rappels/digest). Nettoie les abonnements morts.
   async pushToUser(userId: string, payload: Record<string, unknown>): Promise<number> {
