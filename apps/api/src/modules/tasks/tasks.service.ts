@@ -51,6 +51,25 @@ export class TasksService {
     return task;
   }
 
+  // US-TA-08 — Recherche full-text sur title/description (ILIKE accéléré
+  // par les index GIN trigram), scopée au propriétaire, hors archivées.
+  async search(ownerId: string, query: string) {
+    const q = query.trim();
+    if (q.length === 0) return [];
+    return this.prisma.task.findMany({
+      where: {
+        ownerId,
+        archivedAt: null,
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { description: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 50,
+    });
+  }
+
   // US-TA-05 — Réordonnancement intra-liste : position = index dans la
   // liste fournie. Tous les ids doivent appartenir au owner + à la liste.
   async reorder(ownerId: string, listId: string, orderedIds: string[]) {
