@@ -14,6 +14,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <Link href="/tasks" className="rounded px-2 py-1 hover:bg-[var(--color-border)]">
             Tasks
           </Link>
+          <Link href="/calendar" className="rounded px-2 py-1 hover:bg-[var(--color-border)]">
+            Calendar
+          </Link>
           <Link href="/settings" className="rounded px-2 py-1 hover:bg-[var(--color-border)]">
             Settings
           </Link>
