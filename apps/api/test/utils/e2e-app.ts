@@ -11,6 +11,7 @@ import { MailService } from '../../src/modules/mail/mail.service';
 export class MailCapture {
   readonly verifications = new Map<string, string>();
   readonly resets = new Map<string, string>();
+  readonly magicLinks = new Map<string, string>();
 
   sendVerificationEmail = async (to: string, url: string): Promise<void> => {
     this.verifications.set(to, url);
@@ -18,6 +19,10 @@ export class MailCapture {
 
   sendPasswordResetEmail = async (to: string, url: string): Promise<void> => {
     this.resets.set(to, url);
+  };
+
+  sendMagicLinkEmail = async (to: string, url: string): Promise<void> => {
+    this.magicLinks.set(to, url);
   };
 
   sendPasswordChangedEmail = async (): Promise<void> => undefined;

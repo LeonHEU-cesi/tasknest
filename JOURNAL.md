@@ -3,6 +3,29 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 3 — Auth 2FA + magic link
+
+### Issue #17 — [3.1] US-AU-08 Magic link / OTP par e-mail
+
+Connexion sans mot de passe par lien e-mail, via le plugin Better Auth `magic-link` (fondation [2.0] prête).
+
+Backend
+- Plugin `magicLink` (import dynamique ESM-only) : TTL 15 min, token usage unique, `sendMagicLink` délégué à `MailService.sendMagicLinkEmail`.
+- `MailService.sendMagicLinkEmail(to, url)` ajouté ; callback câblé dans `AuthModule`.
+
+Web
+- `auth-client.ts` : plugin `magicLinkClient`.
+- `/login` : bouton « Email me a sign-in link » (`signIn.magicLink`), écran « check your inbox » (état `magic-sent`).
+
+Tests validés (37/37, 9 fichiers)
+- `TF-AU-08` : demande → e-mail capturé avec token ; vérification (`GET /magic-link/verify`) crée la session.
+- `TS-AU-08` : token à usage unique — le rejeu ne crée pas de session.
+
+Décision
+- `apps/api` `declaration: false` : c'est une application, pas une lib ; supprime les erreurs TS2742 (types internes zod des plugins Better Auth non nommables en sortie `.d.ts`). Vaut pour les prochains plugins (2FA #18).
+
+---
+
 ## Sprint 2 — Auth OAuth
 
 ### Issue #16 — [2.5] TS-AU-* suite de tests sécurité OAuth
