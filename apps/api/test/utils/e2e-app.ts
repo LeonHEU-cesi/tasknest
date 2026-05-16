@@ -5,6 +5,9 @@ import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/bootstrap';
 import { PrismaService } from '../../src/db/prisma.service';
 import { MailService } from '../../src/modules/mail/mail.service';
+import { TokenCipher } from '../../src/common/crypto/token-cipher';
+import { GOOGLE_CALENDAR_TRANSPORT } from '../../src/modules/sync/google-calendar.transport';
+import { FakeGoogleCalendar } from './fake-google-calendar';
 
 // Capture les e-mails au lieu de les envoyer : les tests récupèrent les
 // URLs (token de vérification / reset) directement depuis ce stub.
@@ -50,13 +53,17 @@ export interface E2EContext {
   app: NestExpressApplication;
   prisma: PrismaService;
   mail: MailCapture;
+  google: FakeGoogleCalendar;
 }
 
 export async function createE2EApp(): Promise<E2EContext> {
   const mail = new MailCapture();
+  const google = new FakeGoogleCalendar();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(MailService)
     .useValue(mail)
+    .overrideProvider(GOOGLE_CALENDAR_TRANSPORT)
+    .useValue(google)
     .compile();
 
   // bodyParser:false + configureApp ⇒ même montage Better Auth qu'en prod.
@@ -66,15 +73,51 @@ export async function createE2EApp(): Promise<E2EContext> {
   await configureApp(app, ['http://localhost:3000']);
   await app.init();
 
-  return { app, prisma: app.get(PrismaService), mail };
+  return { app, prisma: app.get(PrismaService), mail, google };
 }
 
-// Ordre FK-safe (account/session/verification dépendent de user).
+// Ordre FK-safe (account/session/verification + sync dépendent de user).
 export async function resetDb(prisma: PrismaService): Promise<void> {
+  await prisma.calendarAccount.deleteMany();
   await prisma.account.deleteMany();
   await prisma.session.deleteMany();
   await prisma.verification.deleteMany();
   await prisma.user.deleteMany();
+}
+
+// US-SY-01 — Simule la liaison d'un compte Google (ce que fait Better Auth
+// au sign-in OAuth) : une ligne `accounts` provider google, refresh_token
+// chiffré avec la même clé que la prod (TokenCipher), scope calendar.
+let testCipher: TokenCipher | undefined;
+export async function linkGoogleAccount(
+  ctx: E2EContext,
+  userId: string,
+  opts: { refreshToken?: string; scope?: string | null } = {},
+): Promise<void> {
+  testCipher ??= await TokenCipher.create(process.env.TASKNEST_DB_ENCRYPTION_KEY);
+  const refresh = opts.refreshToken ?? 'google-refresh-token-test';
+  await ctx.prisma.account.create({
+    data: {
+      accountId: `google-sub-${userId}`,
+      providerId: 'google',
+      userId,
+      refreshToken: testCipher.encrypt(refresh),
+      accessToken: testCipher.encrypt('google-access-token-test'),
+      scope:
+        opts.scope === undefined
+          ? 'openid email profile https://www.googleapis.com/auth/calendar'
+          : opts.scope ?? undefined,
+    },
+  });
+}
+
+// Récupère l'id de l'utilisateur courant via /api/v1/me.
+export async function currentUserId(ctx: E2EContext, cookie: string): Promise<string> {
+  const res = await request(ctx.app.getHttpServer())
+    .get('/api/v1/me')
+    .set('Cookie', cookie);
+  if (res.status >= 400) throw new Error(`/me échoué: ${res.status} ${res.text}`);
+  return res.body.id as string;
 }
 
 export interface TestUser {

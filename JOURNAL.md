@@ -3,7 +3,24 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
-## Sprint 11 — Notifications
+## Sprint 12 — Sync Google Calendar
+
+### Issue #64 — [12.1] US-SY-01 Connexion compte Google Calendar
+
+Backend
+- Modèle `CalendarAccount` (`@@unique(userId,provider,calendarId)`) qui absorbe l'état de sync (`syncToken`, canal `watch`) — 1:1 avec l'agenda connecté, pas de table `sync_states` séparée. Migration via workaround `migrate diff`.
+- **Pas de second flux OAuth** : le refresh_token chiffré + le scope `calendar` sont déjà acquis au sign-in Google (Sprint 2). « Connecter » = déchiffrer le refresh_token (`TokenCipher` fourni en provider, jamais en lecture transparente), prouver qu'on obtient un access_token (`exchangeRefreshToken`), puis upsert du `CalendarAccount`.
+- Déconnexion = **soft** (`disabledAt`) pour ne pas réémettre d'events à la reconnexion ; reconnexion réactive sans perdre `syncToken`/mappings.
+- `GoogleCalendarTransport` : interface isolant `fetch` (token + events + watch), impl HTTP réelle avec back-off 429/5xx + `Retry-After` ; faux transport en mémoire injecté en e2e (comme `MailCapture`).
+- Endpoints `POST /integrations/google/connect`, `GET .../status`, `DELETE /integrations/google` (AuthGuard, owner-scoped). 409 si Google non lié / scope manquant, 502 si Google injoignable, 409 + désactivation si refresh révoqué.
+
+Web
+- `/settings/integrations` : état + connect/disconnect. `apiDelete` ajouté au client.
+
+Tests validés (119/119, +6)
+- `TF-SY-01` : connect refusé sans compte/scope, connect valide le token (idempotent), status, disconnect soft, reconnexion réactive, refresh révoqué ⇒ 502, 401 sans session. Helpers e2e `linkGoogleAccount` / `currentUserId` / `FakeGoogleCalendar`.
+
+---
 
 ### Issue #62 — [11.5] US-NO-05 Centre de notifications in-app
 

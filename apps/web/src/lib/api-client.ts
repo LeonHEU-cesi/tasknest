@@ -67,3 +67,7 @@ export function apiPost<TBody, TResponse>(path: string, body: TBody): Promise<TR
 export function apiPatch<TBody, TResponse>(path: string, body: TBody): Promise<TResponse> {
   return request<TResponse>('PATCH', path, body);
 }
+
+export function apiDelete<TResponse = void>(path: string): Promise<TResponse> {
+  return request<TResponse>('DELETE', path);
+}
