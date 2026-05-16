@@ -3,6 +3,51 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 7 — Vue List + Kanban
+
+### Issue #45 — [7.5] TF-WEB-VW-* Playwright (List + Kanban)
+
+Mise en place de l'infra de tests E2E web (différée depuis le Sprint 0).
+
+- `@playwright/test` + `playwright.config.ts` (webServer = build+start, port dédié) ; script `test:e2e` = `playwright test`.
+- `e2e/views.spec.ts` : **API moquée par interception réseau** (déterministe, pas de back/DB) — TF-WEB-VW-01/02 (Vue Liste : sélection projet/liste, groupement par statut, repli de groupe) + TF-WEB-VW-03/04 (Kanban : colonnes rendues, éditeur retire une colonne).
+- Workflow CI dédié `ci-e2e-web.yml` (install chromium `--with-deps`, sur PR touchant `apps/web`).
+
+Tests validés
+- Playwright **2/2 verts** en local (28.9s). Note : warning Next `experimental.typedRoutes` → `typedRoutes` (drift config non bloquant, dette mineure).
+
+---
+
+### Issue #43/#44 — [7.3/7.4] US-VW-03/04 Vue Kanban (DnD + colonnes personnalisables)
+
+Backend
+- `List.kanbanColumns String[]` (défaut `[todo,doing,done,postponed]`), migration `list_kanban_columns` ; `UpdateListDto.kanbanColumns` validé (statuts valides, sans doublon → 400).
+
+Web
+- Page `/kanban?listId=` : colonnes depuis `list.kanbanColumns`, **DnD** d'une carte entre colonnes (`@dnd-kit/core`) ⇒ `PATCH /tasks/:id {status}` (optimiste).
+- Éditeur de colonnes : ajout / suppression / réordonnancement ⇒ `PATCH /lists/:id {kanbanColumns}`.
+
+Tests validés (92/92)
+- e2e API : défaut + personnalisation persistée ; statut invalide/doublon → 400.
+- web typecheck + lint + build verts ; interaction DnD → Playwright #45.
+
+---
+
+### Issue #41/#42 — [7.1/7.2] US-VW-01/02 Vue Liste (virtual scroll + groupements)
+
+Premier gros sprint front.
+
+Web
+- **Tailwind v4** (CSS-first, `@tailwindcss/postcss`, thème minimal dans `globals.css`) — fin des styles inline.
+- Coquille `(app)/layout.tsx` : barre latérale (Tasks/Settings/Security) + zone principale.
+- Vue Liste `/tasks` : sélecteurs projet/liste, **virtual scroll** (`@tanstack/react-virtual`, gère >200 items), **groupements** collapsables (statut/priorité/tag) via lignes header+task aplaties, badges tags, lien vers Kanban.
+- `lib/api-types.ts` (types partagés vues).
+
+Tests validés
+- web typecheck + lint + build verts (Tailwind compilé). Tests d'interaction Playwright → issue #45 (infra montée en fin de sprint).
+
+---
+
 ## Sprint 6 — Tags, priorités, filtres
 
 ### Issue #37-#40 — [6.3-6.6] US-TG-03/04 + US-TA-09/10 Filtres + tri

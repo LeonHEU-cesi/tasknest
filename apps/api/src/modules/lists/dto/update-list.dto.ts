@@ -1,8 +1,18 @@
-import { IsIn, IsInt, IsOptional, IsString, Length, Min } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+} from 'class-validator';
 
 const VIEWS = ['list', 'kanban', 'calendar', 'timeline'] as const;
+const KANBAN_STATUSES = ['todo', 'doing', 'done', 'postponed', 'canceled'] as const;
 
-// US-LI-01 — Mise à jour partielle d'une liste.
+// US-LI-01 / US-VW-04 — Mise à jour partielle d'une liste.
 export class UpdateListDto {
   @IsOptional()
   @IsString()
@@ -21,4 +31,11 @@ export class UpdateListDto {
   @IsInt()
   @Min(0)
   position?: number;
+
+  // US-VW-04 — colonnes Kanban ordonnées, statuts valides, sans doublon.
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(KANBAN_STATUSES as unknown as string[], { each: true })
+  kanbanColumns?: (typeof KANBAN_STATUSES)[number][];
 }
