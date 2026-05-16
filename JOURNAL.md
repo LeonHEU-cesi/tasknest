@@ -5,6 +5,16 @@
 
 ## Sprint 12 — Sync Google Calendar
 
+### Issue #67 — [12.4] TS-SY-GOOGLE + handling rate-limit
+
+- Refactor `GoogleCalendarHttpTransport` : `call()` unique centralise back-off exponentiel plafonné, `Retry-After` (secondes **ou** date HTTP), détection rejouable (`isRetryableGoogle` : 429/5xx + **403 quota** `rateLimitExceeded`/`backendError`, sinon définitif), 404/410 absorbés (delete/list). `fetch` + `sleep` + `maxRetries`/`baseDelayMs` **injectables** (constructeur, défauts prod inchangés).
+- Token exchange passe aussi par `call()` ⇒ retry sur 429/5xx du endpoint OAuth ; `invalid_grant` (400) reste définitif (reconnexion).
+
+Tests validés (138/138, +10)
+- `TS-SY-GOOGLE` (unit, fetch/sleep mockés, 20 ms) : succès, invalid_grant non rejoué, 429→retry→succès, 5xx persistant ⇒ erreur rejouable après `maxRetries`, `Retry-After` respecté, 403 quota vs 403 simple, 404/410 absorbés, 410 list ⇒ resync, typage `GoogleCalendarError`.
+
+---
+
 ### Issue #66 — [12.3] US-SY-03 Worker pull événements Google + webhook watch
 
 Backend

@@ -85,19 +85,93 @@ export interface GoogleCalendarTransport {
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const API = 'https://www.googleapis.com/calendar/v3';
-const MAX_RETRIES = 4;
+const DEFAULT_MAX_RETRIES = 4;
+const DEFAULT_BASE_DELAY_MS = 500;
+const MAX_DELAY_MS = 8000;
 
-// #67 — Implémentation HTTP réelle : un seul `request()` centralise le
-// back-off exponentiel sur 429/5xx (respecte `Retry-After`) et la
-// traduction des statuts en `GoogleCalendarError`. Le refresh du token est
-// fait en amont par le service (il a besoin du compte chiffré).
+// #67 — Réponses rejouables : 429, 5xx, et 403 dont la raison est une
+// limite de quota (Google renvoie parfois `403 rateLimitExceeded` au lieu
+// de 429). `invalid_grant` (400) reste définitif ⇒ reconnexion requise.
+export function isRetryableGoogle(status: number, body: string): boolean {
+  if (status === 429 || status >= 500) return true;
+  if (status === 403) {
+    return /rateLimitExceeded|userRateLimitExceeded|backendError/i.test(body);
+  }
+  return false;
+}
+
+export interface HttpTransportOptions {
+  // Injectables pour TS-SY-GOOGLE : fetch + temporisation déterministes
+  // (tester le rate-limit sans réseau ni attente réelle).
+  fetchImpl?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
+  maxRetries?: number;
+  baseDelayMs?: number;
+}
+
+// #67 — Implémentation HTTP réelle : `call()` centralise le back-off
+// exponentiel (respecte `Retry-After` en secondes ou date HTTP), la
+// détection des erreurs rejouables et la traduction en
+// `GoogleCalendarError`. fetch + sleep sont injectables.
 export class GoogleCalendarHttpTransport implements GoogleCalendarTransport {
   private readonly logger = new Logger(GoogleCalendarHttpTransport.name);
+  private readonly fetchImpl: typeof fetch;
+  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly maxRetries: number;
+  private readonly baseDelayMs: number;
 
   constructor(
     private readonly clientId: string,
     private readonly clientSecret: string,
-  ) {}
+    opts: HttpTransportOptions = {},
+  ) {
+    this.fetchImpl = opts.fetchImpl ?? fetch;
+    this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.baseDelayMs = opts.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
+  }
+
+  // `Retry-After` prioritaire (secondes ou date HTTP), sinon back-off
+  // exponentiel plafonné.
+  private retryDelayMs(res: Response, attempt: number): number {
+    const header = res.headers.get('retry-after');
+    if (header) {
+      const asNumber = Number(header);
+      if (Number.isFinite(asNumber) && asNumber >= 0) return asNumber * 1000;
+      const asDate = Date.parse(header);
+      if (!Number.isNaN(asDate)) return Math.max(0, asDate - Date.now());
+    }
+    return Math.min(2 ** attempt * this.baseDelayMs, MAX_DELAY_MS);
+  }
+
+  private async call<T>(
+    url: string | URL,
+    init: RequestInit,
+    label: string,
+  ): Promise<{ status: number; json: T }> {
+    for (let attempt = 0; ; attempt++) {
+      const res = await this.fetchImpl(url, init);
+      if (res.ok || res.status === 204) {
+        const json = res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+        return { status: res.status, json };
+      }
+      const body = await res.text().catch(() => '');
+      const retryable = isRetryableGoogle(res.status, body);
+      if (retryable && attempt < this.maxRetries) {
+        const delay = this.retryDelayMs(res, attempt);
+        this.logger.warn(
+          `Google ${res.status} sur ${label} — retry #${attempt + 1} dans ${delay}ms`,
+        );
+        await this.sleep(delay);
+        continue;
+      }
+      throw new GoogleCalendarError(
+        `Google ${res.status} sur ${label}${body ? ` — ${body.slice(0, 200)}` : ''}`,
+        res.status,
+        retryable,
+      );
+    }
+  }
 
   async exchangeRefreshToken(
     refreshToken: string,
@@ -108,21 +182,15 @@ export class GoogleCalendarHttpTransport implements GoogleCalendarTransport {
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     });
-    const res = await fetch(TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    if (!res.ok) {
-      // 400 invalid_grant = refresh_token révoqué ⇒ non-retryable, le
-      // service doit désactiver le compte et demander une reconnexion.
-      throw new GoogleCalendarError(
-        `token exchange failed: ${res.status}`,
-        res.status,
-        res.status === 429 || res.status >= 500,
-      );
-    }
-    const json = (await res.json()) as { access_token: string; expires_in: number };
+    const { json } = await this.call<{ access_token: string; expires_in: number }>(
+      TOKEN_URL,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body,
+      },
+      'token exchange',
+    );
     return { accessToken: json.access_token, expiresInSec: json.expires_in };
   }
 
@@ -135,38 +203,18 @@ export class GoogleCalendarHttpTransport implements GoogleCalendarTransport {
   ): Promise<{ status: number; json: T }> {
     const url = new URL(`${API}${path}`);
     for (const [k, v] of Object.entries(query ?? {})) url.searchParams.set(k, v);
-
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetch(url, {
+    return this.call<T>(
+      url,
+      {
         method,
         headers: {
           authorization: `Bearer ${accessToken}`,
           ...(payload ? { 'content-type': 'application/json' } : {}),
         },
         body: payload ? JSON.stringify(payload) : undefined,
-      });
-
-      if (res.ok || res.status === 204) {
-        const json = res.status === 204 ? (undefined as T) : ((await res.json()) as T);
-        return { status: res.status, json };
-      }
-
-      const retryable = res.status === 429 || res.status >= 500;
-      if (retryable && attempt < MAX_RETRIES) {
-        const retryAfter = Number(res.headers.get('retry-after'));
-        const delayMs = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
-          : Math.min(2 ** attempt * 500, 8000);
-        this.logger.warn(`Google ${res.status} sur ${method} ${path} — retry dans ${delayMs}ms`);
-        await new Promise((r) => setTimeout(r, delayMs));
-        continue;
-      }
-      throw new GoogleCalendarError(
-        `Google API ${res.status} sur ${method} ${path}`,
-        res.status,
-        retryable,
-      );
-    }
+      },
+      `${method} ${path}`,
+    );
   }
 
   async insertEvent(
