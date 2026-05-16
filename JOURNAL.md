@@ -5,6 +5,26 @@
 
 ## Sprint 3 — Auth 2FA + magic link
 
+### Issue #19 — [3.3] US-SEC-02 2FA obligatoire au login + challenge
+
+Enforcement du challenge 2FA après l'étape 1, géré nativement par le plugin Better Auth `two-factor`.
+
+Backend (comportement plugin)
+- 2FA active ⇒ `POST /sign-in/email` renvoie `{ twoFactorRedirect: true }` et un cookie « en attente » qui **n'autorise rien** (le guard `/me` répond 401) tant que le challenge n'est pas passé.
+- `POST /two-factor/verify-totp` ou `/two-factor/verify-backup-code` (code one-shot) débloque la session.
+
+Web
+- Page `/auth/2fa-challenge` : saisie code TOTP **ou** code de récupération (bascule), `verifyTotp` / `verifyBackupCode`.
+- `/login` : si `twoFactorRedirect`, redirection (`useRouter`) vers `/auth/2fa-challenge`.
+
+Tests validés (44/44)
+- `TS-SEC-02` : 2FA active → sign-in renvoie le challenge, `/me` reste 401 ; TOTP valide → `/me` 200 ; code de récupération one-shot (rejeu refusé).
+
+Décision
+- Invariant testé = accès réel (`/me` 401→200) plutôt que présence/absence de cookie : Better Auth pose un cookie pending, c'est l'autorisation effective qui doit être bloquée.
+
+---
+
 ### Issue #18 — [3.2] US-SEC-01 2FA TOTP + codes de récupération
 
 Activation de la double authentification via le plugin Better Auth `two-factor`.

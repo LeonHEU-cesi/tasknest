@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { signIn } from '@/lib/auth-client';
 
 // US-AU-03 / US-AU-05 — Connexion e-mail/mot de passe + « Continue with
@@ -13,6 +14,7 @@ export default function LoginPage() {
   >('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const router = useRouter();
   const callbackURL =
     typeof window !== 'undefined' ? `${window.location.origin}/settings` : '/settings';
 
@@ -21,7 +23,7 @@ export default function LoginPage() {
     setStatus('submitting');
     setErrorMessage(null);
 
-    const { error } = await signIn.email({ email, password });
+    const { data, error } = await signIn.email({ email, password });
     if (error) {
       setStatus('idle');
       if (error.status === 403) {
@@ -31,6 +33,12 @@ export default function LoginPage() {
       } else {
         setErrorMessage(error.message ?? 'Unexpected error, please retry.');
       }
+      return;
+    }
+    // US-SEC-02 : si 2FA active, Better Auth ne pose pas la session et
+    // demande le challenge.
+    if ((data as { twoFactorRedirect?: boolean })?.twoFactorRedirect) {
+      router.push('/2fa-challenge');
       return;
     }
     setStatus('success');
