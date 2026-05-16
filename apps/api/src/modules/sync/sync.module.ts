@@ -5,6 +5,7 @@ import { GoogleCalendarService } from './google-calendar.service';
 import { GooglePushService } from './google-push.service';
 import { GooglePullService } from './google-pull.service';
 import { MicrosoftCalendarService } from './microsoft-calendar.service';
+import { MicrosoftPushService } from './microsoft-push.service';
 import { SyncController } from './sync.controller';
 import { MicrosoftSyncController } from './microsoft-sync.controller';
 import { SyncWebhookController } from './sync-webhook.controller';
@@ -30,6 +31,7 @@ import {
     GooglePushService,
     GooglePullService,
     MicrosoftCalendarService,
+    MicrosoftPushService,
     SyncQueue,
     {
       provide: TokenCipher,
@@ -62,6 +64,7 @@ import {
     GooglePushService,
     GooglePullService,
     MicrosoftCalendarService,
+    MicrosoftPushService,
   ],
 })
 export class SyncModule {}
