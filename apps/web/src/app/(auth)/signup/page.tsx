@@ -1,44 +1,37 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { ApiClientError, apiPost } from '@/lib/api-client';
+import { signIn, signUp } from '@/lib/auth-client';
 
-interface SignupResponse {
-  id: string;
-  email: string;
-}
-
-interface SignupBody {
-  email: string;
-  password: string;
-  displayName: string;
-}
-
+// US-AU-01 / US-AU-05 — Création de compte e-mail/mot de passe (vérification
+// e-mail requise) + « Continue with Google ».
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [name, setName] = useState('');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const callbackURL =
+    typeof window !== 'undefined' ? `${window.location.origin}/settings` : '/settings';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus('submitting');
     setErrorMessage(null);
 
-    try {
-      await apiPost<SignupBody, SignupResponse>('/auth/signup', {
-        email,
-        password,
-        displayName,
-      });
-      setStatus('success');
-    } catch (error) {
-      setStatus('error');
-      setErrorMessage(
-        error instanceof ApiClientError ? error.message : 'Unexpected error, please retry.',
-      );
+    const { error } = await signUp.email({ email, password, name });
+    if (error) {
+      setStatus('idle');
+      setErrorMessage(error.message ?? 'Unexpected error, please retry.');
+      return;
     }
+    setStatus('success');
+  };
+
+  const handleGoogle = async () => {
+    setErrorMessage(null);
+    await signIn.social({ provider: 'google', callbackURL });
   };
 
   if (status === 'success') {
@@ -57,13 +50,19 @@ export default function SignupPage() {
     <main style={pageStyle}>
       <h1>Create your Tasknest account</h1>
 
+      <button type="button" onClick={handleGoogle} style={buttonStyle}>
+        Continue with Google
+      </button>
+
+      <p style={{ textAlign: 'center', opacity: 0.6, margin: '1rem 0' }}>or</p>
+
       <form onSubmit={handleSubmit} noValidate style={formStyle}>
         <label style={labelStyle}>
           Display name
           <input
             type="text"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             required
             maxLength={80}
             autoComplete="name"
@@ -91,13 +90,11 @@ export default function SignupPage() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required
-            minLength={10}
+            minLength={8}
             autoComplete="new-password"
             style={inputStyle}
           />
-          <small>
-            At least 10 characters with one uppercase letter, one lowercase letter, and one digit.
-          </small>
+          <small>At least 8 characters.</small>
         </label>
 
         <button
@@ -125,7 +122,6 @@ const formStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
-  marginTop: '1.5rem',
 } as const;
 
 const labelStyle = {
@@ -153,6 +149,7 @@ const buttonStyle = {
   cursor: 'pointer',
   fontSize: '1rem',
   fontWeight: 600,
+  width: '100%',
 } as const;
 
 const errorStyle = {
