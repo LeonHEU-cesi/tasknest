@@ -3,6 +3,25 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 14 — Sync Apple CalDAV
+
+### Issue #72 — [14.1] US-SY-07 Connexion compte CalDAV (URL + user + app-password)
+
+Modèle **différent** des providers OAuth (pas de flux OAuth, pas de webhook).
+
+Backend
+- Colonnes `CalendarAccount` `caldavUrl/Username/Password/Kind` (migration via workaround). `provider='caldav'`, `calendarId`=URL collection (clé d'unicité). **App-password chiffré au repos** (`TokenCipher`, jamais en clair ; déchiffré seulement en mémoire pour appeler le serveur).
+- `CaldavTransport` (interface) + `CaldavHttpTransport` : auth Basic, `call()` durci (back-off + Retry-After, parité Google/MS), `validate` (PROPFIND), `putEvent`/`getEvent`/`deleteEvent` (If-Match/If-None-Match ETag), `syncCollection` (RFC 6578, `unsupported` ⇒ repli), `listEtags` (PROPFIND depth:1). Parsing multistatus regex tolérant aux préfixes de namespace. `detectCaldavKind` (icloud/nextcloud/samsung/generic depuis l'URL).
+- `CaldavService` connect/status/disconnect/getCredentials ; DTO `ConnectCaldavDto` (`@IsUrl` require_protocol). `CaldavSyncController` sous `integrations/caldav` (connect = POST body, AuthGuard).
+
+Web
+- `/settings/integrations` : carte CalDAV avec **formulaire** (URL/user/app-password) au lieu d'un bouton OAuth.
+
+Tests validés (169/169, +6)
+- `TF-SY-07` : connecte + **chiffrement vérifié** (decrypt round-trip), détection iCloud/Nextcloud/générique, identifiants invalides ⇒ 409, statut + déconnexion soft, DTO URL invalide ⇒ 400, 401. `FakeCaldav` (`ctx.caldav`).
+
+---
+
 ## Sprint 13 — Sync Microsoft Graph
 
 ### Issue #71 — [13.4] TS-SY-MS + handling refresh token
