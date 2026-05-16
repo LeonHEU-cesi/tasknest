@@ -30,3 +30,7 @@ process.env.TASKNEST_DB_ENCRYPTION_KEY ||= 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH
 // (aucun appel Google). Les vrais seront fournis par Léon.
 process.env.GOOGLE_CLIENT_ID ||= 'tasknest-e2e-google-client-id.apps.googleusercontent.com';
 process.env.GOOGLE_CLIENT_SECRET ||= 'tasknest-e2e-google-client-secret';
+process.env.MICROSOFT_CLIENT_ID ||= 'tasknest-e2e-microsoft-client-id';
+process.env.MICROSOFT_CLIENT_SECRET ||= 'tasknest-e2e-microsoft-client-secret';
+process.env.APPLE_CLIENT_ID ||= 'com.tasknest.e2e';
+process.env.APPLE_CLIENT_SECRET ||= 'tasknest-e2e-apple-client-secret';
