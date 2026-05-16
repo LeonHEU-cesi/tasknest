@@ -5,6 +5,19 @@
 
 ## Sprint 5 — Tasks hierarchy
 
+### Issue #33 — [5.6] US-TA-07 Assignation d'une tâche
+
+Backend
+- Schéma : `Task.assignedTo` (FK user, `SetNull`), relations nommées `TaskOwner`/`TaskAssignee` (User : `tasks`/`assignedTasks`). Migration `task_assigned_to`.
+- `PATCH /tasks/:id/assignee {assignedTo}` (vérif assigné = compte existant non supprimé → 404 sinon) ; `DELETE /tasks/:id/assignee` (désassignation).
+- Dropdown membres de projet + notif au destinataire = sprints sharing (S16) / notifs (S11) — colonne posée en prep.
+
+Tests validés (74/74)
+- `TF-TA-07` : assigner → `assignedTo` renseigné ; désassigner → null.
+- `TS-TA-07` : assigné inexistant → 404.
+
+---
+
 ### Issue #31/#32 — [5.4/5.5] US-TA-05/06 Réordonnancement + estimation
 
 Backend

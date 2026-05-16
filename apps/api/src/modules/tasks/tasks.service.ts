@@ -211,6 +211,23 @@ export class TasksService {
     }
   }
 
+  // US-TA-07 — Assignation. Sans module de partage (sprint 16), on valide
+  // simplement que l'assigné est un compte existant non supprimé.
+  async assign(ownerId: string, id: string, assigneeId: string) {
+    await this.findOne(ownerId, id);
+    const assignee = await this.prisma.user.findFirst({
+      where: { id: assigneeId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!assignee) throw new NotFoundException('assignee-not-found');
+    return this.prisma.task.update({ where: { id }, data: { assignedTo: assigneeId } });
+  }
+
+  async unassign(ownerId: string, id: string) {
+    await this.findOne(ownerId, id);
+    return this.prisma.task.update({ where: { id }, data: { assignedTo: null } });
+  }
+
   // US-TA-04 — Soft-delete (archive) + restauration tant que non purgée.
   async archive(ownerId: string, id: string) {
     await this.findOne(ownerId, id);
