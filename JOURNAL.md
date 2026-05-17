@@ -5,6 +5,18 @@
 
 ## Sprint 15 — Export .ics universel
 
+### Issue #77 — [15.2] US-SY-11 URL d'abonnement .ics par compte
+
+- `User.icsFeedToken` (`@unique`, nullable) + migration. Token = `randomBytes(24).base64url` (non devinable, rotable, révocable).
+- `IcsExportService` : `enableFeed` (génère/rotation — purge le cache de l'ancien token ⇒ l'URL fuitée cesse aussitôt), `revokeFeed`, `feedStatus`, `feedByToken` (**cache serveur 5 min** par token).
+- `IcsExportController` (AuthGuard) : `POST /export/feed`, `GET /export/feed/status`, `DELETE /export/feed`. `IcsFeedController` **public sans AuthGuard** : `GET /feed/:token.ics` (les clients agenda n'envoient pas de cookie ; secret = token URL), `Cache-Control: private, max-age=300`.
+- Périmètre : flux backend (URL/token/cache). UI d'activation = polish mineur ultérieur (le bouton visible reste l'export #76).
+
+Tests validés (195/195, +2)
+- `TF-SY-11` : activation + path, flux public sans session, **cache 5 min** (tâche ajoutée après ⇒ absente jusqu'à rotation), rotation invalide l'ancien token (404) et sert le neuf à jour, révocation ⇒ 404 + status, token inconnu ⇒ 404, gestion exige une session (401).
+
+---
+
 ### Issue #76 — [15.1] US-SY-10 Export .ics liste / projet (téléchargement)
 
 - Refactor `caldav-ical.mapper.ts` : extraction `taskToVevent` (bloc VEVENT seul) ⇒ `taskToICal` (1 event, CalDAV inchangé) + **`tasksToICalendar`** (VCALENDAR multi-VEVENT, `X-WR-CALNAME`, tâches sans `dueAt` ignorées). Zéro dépendance.

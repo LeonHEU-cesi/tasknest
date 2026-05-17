@@ -1,4 +1,14 @@
-import { Controller, Get, Param, ParseUUIDPipe, Res, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '../../auth/auth.guard';
 import type { AuthenticatedUser } from '../../auth/auth.guard';
@@ -38,5 +48,25 @@ export class IcsExportController {
   ): Promise<void> {
     const { ics, name } = await this.exportSvc.exportProject(user.id, projectId);
     sendCalendar(res, ics, name);
+  }
+
+  // US-SY-11 — gestion du flux d'abonnement (owner-scoped). POST = activer
+  // ou faire tourner le token (invalide l'ancienne URL si elle a fuité).
+  @Post('feed')
+  enableFeed(@CurrentUser() user: AuthenticatedUser): Promise<{ token: string; path: string }> {
+    return this.exportSvc.enableFeed(user.id);
+  }
+
+  @Get('feed/status')
+  feedStatus(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ enabled: boolean; path?: string }> {
+    return this.exportSvc.feedStatus(user.id);
+  }
+
+  @Delete('feed')
+  @HttpCode(204)
+  async revokeFeed(@CurrentUser() user: AuthenticatedUser): Promise<void> {
+    await this.exportSvc.revokeFeed(user.id);
   }
 }
