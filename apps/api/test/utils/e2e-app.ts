@@ -99,6 +99,7 @@ export async function createE2EApp(): Promise<E2EContext> {
 
 // Ordre FK-safe (account/session/verification + sync dépendent de user).
 export async function resetDb(prisma: PrismaService): Promise<void> {
+  await prisma.comment.deleteMany();
   await prisma.syncEvent.deleteMany();
   await prisma.calendarAccount.deleteMany();
   await prisma.projectShare.deleteMany();

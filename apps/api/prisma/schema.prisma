@@ -64,6 +64,7 @@ model User {
   calendarAccounts  CalendarAccount[]
   sharesInvited     ProjectShare[]     @relation("ShareInvitedBy")
   sharesMember      ProjectShare[]     @relation("ShareMember")
+  comments          Comment[]
 
   @@index([deletedAt])
   @@map("users")
@@ -206,6 +207,24 @@ model ProjectShare {
   @@map("project_shares")
 }
 
+// US-CO-01/02 — Commentaire sur une tâche. Visible par tout collaborateur
+// ayant accès au projet (viewer+) ; édition/suppression réservées à
+// l'auteur (le propriétaire du projet peut aussi supprimer = modération).
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  body      String   @db.VarChar(5000)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("comments")
+}
+
 // US-LI-01 — Listes dans un projet.
 model List {
   id          String    @id @default(uuid()) @db.Uuid
@@ -271,6 +290,7 @@ model Task {
   recurrenceRule RecurrenceRule? @relation(fields: [recurrenceRuleId], references: [id], onDelete: SetNull)
   notifications  Notification[]
   syncEvents     SyncEvent[]
+  comments       Comment[]
 
   @@unique([recurrenceRuleId, occurrenceDate])
   @@index([listId])
