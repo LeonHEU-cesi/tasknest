@@ -5,6 +5,16 @@
 
 ## Sprint 16 — Partage / collaboration
 
+### Issue #84 — [16.6] US-CO-02 Mentions @user dans commentaire + notif
+
+- Parsing `@email` (e-mails uniques ⇒ non ambigu) à la création d'un commentaire. Notification `type='comment'` `channel='in_app'` (`sentAt=now` ⇒ visible immédiatement dans le centre in-app) créée **uniquement** pour les comptes ayant réellement accès au projet (`AccessService.projectRole != null`), jamais l'auteur, jamais une adresse arbitraire. `scheduledFor` distinct par mention (contrainte unique `(task,type,scheduledFor)` ⇒ pas de collision).
+- Mention sur édition non gérée (création seulement — documenté).
+
+Tests validés (220/220, +2)
+- mention d'un collaborateur ⇒ notif in-app (payload `byName`), outsider sans accès ⇒ aucune notif, auto-mention ⇒ aucune, commentaire sans mention ⇒ aucune.
+
+---
+
 ### Issue #83 — [16.5] US-CO-01 Commentaires sur tâche (CRUD)
 
 - Modèle `Comment` (task/author, `@@index(taskId,createdAt)`) + migration. Relations Task/User.

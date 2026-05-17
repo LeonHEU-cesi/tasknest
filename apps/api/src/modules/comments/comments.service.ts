@@ -54,16 +54,77 @@ export class CommentsService {
     return comments.map((c) => this.view(c));
   }
 
+  // US-CO-02 — `@email` non ambigus (les e-mails sont uniques). On ne
+  // notifie que des comptes ayant **réellement accès** au projet (jamais
+  // une adresse arbitraire), et jamais l'auteur lui-même.
+  private static readonly MENTION_RE =
+    /@([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+
+  private async notifyMentions(
+    authorId: string,
+    taskId: string,
+    projectId: string,
+    body: string,
+    commentId: string,
+    authorName: string,
+  ): Promise<void> {
+    const emails = [
+      ...new Set(
+        [...body.matchAll(CommentsService.MENTION_RE)].map((m) =>
+          m[1].toLowerCase(),
+        ),
+      ),
+    ];
+    if (emails.length === 0) return;
+
+    const users = await this.prisma.user.findMany({
+      where: { email: { in: emails }, deletedAt: null },
+      select: { id: true },
+    });
+    let offset = 0;
+    for (const u of users) {
+      if (u.id === authorId) continue;
+      const role = await this.access.projectRole(u.id, projectId);
+      if (!role) continue; // pas d'accès ⇒ pas de notification
+      // scheduledFor distinct (la contrainte unique est (task,type,
+      // scheduledFor)) ⇒ pas de collision multi-mentions.
+      const when = new Date(Date.now() + offset++);
+      await this.prisma.notification.create({
+        data: {
+          userId: u.id,
+          taskId,
+          type: 'comment',
+          channel: 'in_app',
+          payload: {
+            commentId,
+            byName: authorName,
+            excerpt: body.slice(0, 140),
+          },
+          scheduledFor: when,
+          sentAt: when, // visible immédiatement dans le centre in-app
+        },
+      });
+    }
+  }
+
   async create(
     userId: string,
     taskId: string,
     body: string,
   ): Promise<CommentView> {
-    await this.access.requireTask(userId, taskId, 'viewer');
+    const { projectId } = await this.access.requireTask(userId, taskId, 'viewer');
     const created = await this.prisma.comment.create({
       data: { taskId, authorId: userId, body },
       include: { author: { select: { name: true } } },
     });
+    await this.notifyMentions(
+      userId,
+      taskId,
+      projectId,
+      body,
+      created.id,
+      created.author.name,
+    );
     return this.view(created);
   }
 
