@@ -13,6 +13,7 @@ import { RecurrenceModule } from './modules/recurrence/recurrence.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { IcsExportModule } from './modules/ics-export/ics-export.module';
+import { SharingModule } from './modules/sharing/sharing.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { IcsExportModule } from './modules/ics-export/ics-export.module';
     NotificationsModule,
     SyncModule,
     IcsExportModule,
+    SharingModule,
   ],
 })
 export class AppModule {}
