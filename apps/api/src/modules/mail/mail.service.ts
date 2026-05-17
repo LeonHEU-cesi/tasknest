@@ -116,4 +116,30 @@ export class MailService {
       this.logger.warn(`Failed to send password-changed notice to ${to}`, error);
     }
   }
+
+  // US-SH-01 — invitation à collaborer sur un projet partagé.
+  async sendShareInviteEmail(
+    to: string,
+    inviteUrl: string,
+    projectName: string,
+    role: string,
+  ): Promise<void> {
+    const html = `
+      <p>You have been invited to collaborate on the Tasknest project
+      <strong>${projectName}</strong> as <strong>${role}</strong>.</p>
+      <p><a href="${inviteUrl}">Accept or decline the invitation</a></p>
+      <p>This invitation link expires in 7 days.</p>
+    `.trim();
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject: `Invitation to collaborate on "${projectName}"`,
+        html,
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to send share invite to ${to}`, error);
+    }
+  }
 }

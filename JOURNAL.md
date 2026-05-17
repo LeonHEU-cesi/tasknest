@@ -3,6 +3,19 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 16 — Partage / collaboration
+
+### Issue #79 — [16.1] US-SH-01 Invitation projet par e-mail (viewer/editor)
+
+- Modèle `ProjectShare` (`@@unique(projectId,invitedEmail)`, statut pending/accepted/declined/revoked, token unique, role viewer/editor, `expiresAt` 7 j, `userId` lié à l'acceptation) + migration. Relations Project/User.
+- Module `sharing` : `SharingService.invite` (owner-only, **upsert** sur (projet,e-mail) ⇒ ré-invitation sans doublon, token/rôle rafraîchis, refus d'inviter sa propre adresse) + `list`. `MailService.sendShareInviteEmail` (lien `${WEB_PUBLIC_URL}/invites/<token>`). Token jamais exposé par l'API (uniquement dans l'e-mail).
+- `SharingController` `POST/GET /projects/:projectId/shares` (AuthGuard, owner-only).
+
+Tests validés (206/206, +5)
+- `TF-SH-01` : invite + e-mail capturé avec token, listing, ré-invitation = upsert, auto-invitation ⇒ 400, non-propriétaire ⇒ 404, DTO invalide ⇒ 400, 401.
+
+---
+
 ## Sprint 15 — Export .ics universel
 
 ### Issue #78 — [15.3] US-SY-12 Import .ics one-shot (fichier ou URL)

@@ -62,6 +62,8 @@ model User {
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
   calendarAccounts  CalendarAccount[]
+  sharesInvited     ProjectShare[]     @relation("ShareInvitedBy")
+  sharesMember      ProjectShare[]     @relation("ShareMember")
 
   @@index([deletedAt])
   @@map("users")
@@ -162,12 +164,46 @@ model Project {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  owner User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  lists List[]
+  owner  User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  lists  List[]
+  shares ProjectShare[]
 
   @@index([ownerId])
   @@index([ownerId, archivedAt])
   @@map("projects")
+}
+
+// US-SH-01..04 — Partage d'un projet avec un autre compte. L'accès effectif
+// d'un utilisateur à un projet (et ses listes/tâches) = propriétaire OU
+// `ProjectShare` accepté (rôle viewer/editor). Le filtrage par accès est
+// appliqué au niveau applicatif (AccessService) — cohérent avec tout le
+// codebase (pas de RLS Postgres). `invitedEmail` = cible de l'invitation ;
+// `userId` est lié au compte à l'acceptation (peut différer si l'e-mail
+// invité n'est pas l'e-mail du compte qui accepte).
+model ProjectShare {
+  id           String    @id @default(uuid()) @db.Uuid
+  projectId    String    @map("project_id") @db.Uuid
+  invitedEmail String    @map("invited_email") @db.VarChar(254)
+  // 'viewer' | 'editor'
+  role         String    @default("viewer") @db.VarChar(16)
+  // 'pending' | 'accepted' | 'declined' | 'revoked'
+  status       String    @default("pending") @db.VarChar(16)
+  token        String    @unique
+  invitedById  String    @map("invited_by_id") @db.Uuid
+  userId       String?   @map("user_id") @db.Uuid
+  expiresAt    DateTime  @map("expires_at")
+  acceptedAt   DateTime? @map("accepted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invitedBy User    @relation("ShareInvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  user      User?   @relation("ShareMember", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, invitedEmail])
+  @@index([userId, status])
+  @@index([projectId, status])
+  @@map("project_shares")
 }
 
 // US-LI-01 — Listes dans un projet.
