@@ -3,6 +3,19 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 15 — Export .ics universel
+
+### Issue #76 — [15.1] US-SY-10 Export .ics liste / projet (téléchargement)
+
+- Refactor `caldav-ical.mapper.ts` : extraction `taskToVevent` (bloc VEVENT seul) ⇒ `taskToICal` (1 event, CalDAV inchangé) + **`tasksToICalendar`** (VCALENDAR multi-VEVENT, `X-WR-CALNAME`, tâches sans `dueAt` ignorées). Zéro dépendance.
+- Module `ics-export` : `IcsExportService` (exportList/exportProject/exportAccount **owner-scoped**, tâches non archivées à échéance, triées) + `IcsExportController` `GET /export/lists/:id.ics` & `/export/projects/:id.ics` (AuthGuard, `text/calendar; charset=utf-8`, `Content-Disposition: attachment`, filename assaini).
+- Web : lien « Export .ics » (liste/projet) dans la vue Liste, ancre directe (cookie de session) ; helper `apiUrl()`.
+
+Tests validés (193/193, +4) — Playwright 6/6
+- `TF-SY-10` : VCALENDAR des tâches à échéance (sans-échéance & archivées exclues), agrégation projet, **404 cross-user**, 400 id non-UUID, 401.
+
+---
+
 ## Sprint 14 — Sync Apple CalDAV
 
 ### Issue #75 — [14.4] TS-SY-CALDAV + retry strategy

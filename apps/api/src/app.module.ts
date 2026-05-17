@@ -12,6 +12,7 @@ import { TagsModule } from './modules/tags/tags.module';
 import { RecurrenceModule } from './modules/recurrence/recurrence.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { IcsExportModule } from './modules/ics-export/ics-export.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SyncModule } from './modules/sync/sync.module';
     RecurrenceModule,
     NotificationsModule,
     SyncModule,
+    IcsExportModule,
   ],
 })
 export class AppModule {}
