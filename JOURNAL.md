@@ -5,6 +5,18 @@
 
 ## Sprint 15 — Export .ics universel
 
+### Issue #78 — [15.3] US-SY-12 Import .ics one-shot (fichier ou URL)
+
+- `parseICalendar` ajouté à `caldav-ical.mapper.ts` : découpe un VCALENDAR en N blocs VEVENT (après dépliage) et parse chacun (`parseEventLines` factorisé ; `parseICalEvent` inchangé pour CalDAV). VTIMEZONE/en-têtes ignorés.
+- `IcsImportService` : `preview` (parse sans persistance ⇒ candidats {title,dueAt,description}) + `confirm` (création `createMany` dans une liste **owner-scoped**). Source = `{ics}` brut (« upload fichier » lu côté client) **ou** `{url}` distante.
+- **Anti-SSRF** (sensibilité infra opérateur) : `assertSafeUrl` bloque localhost/`*.local`/`*.internal`/loopback/IP privées (10/172.16-31/192.168/169.254/IPv6 ULA/link-local)/metadata `169.254.169.254` ; `fetch` `redirect:'error'` + timeout 5 s + cap 2 Mo. Résiduel DNS-rebinding documenté (import déclenché par l'utilisateur lui-même).
+- DTOs class-validator (`ics` 1..2 000 000, `url` http(s) `require_protocol`, `listId` UUID). Contrôleur `import/ics/{preview,confirm}` (AuthGuard).
+
+Tests validés (201/201, +6)
+- `TF-SY-12` : preview multi-VEVENT (échappement + ligne pliée + VTIMEZONE ignoré, sans persistance), confirm crée owner-scoped, **404 cross-user**, **SSRF rejeté** (localhost/127/169.254/192.168/10 ⇒ 400), ni ics ni url ⇒ 400, protocole non http(s) ⇒ 400, 401.
+
+---
+
 ### Issue #77 — [15.2] US-SY-11 URL d'abonnement .ics par compte
 
 - `User.icsFeedToken` (`@unique`, nullable) + migration. Token = `randomBytes(24).base64url` (non devinable, rotable, révocable).

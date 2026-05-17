@@ -125,9 +125,9 @@ function icalToDate(value: string): string | undefined {
   ).toISOString();
 }
 
-export function parseICalEvent(ics: string): ParsedICalEvent {
+function parseEventLines(lines: string[]): ParsedICalEvent {
   const result: ParsedICalEvent = {};
-  for (const line of unfold(ics)) {
+  for (const line of lines) {
     const idx = line.indexOf(':');
     if (idx < 0) continue;
     const name = line.slice(0, idx).split(';')[0].toUpperCase();
@@ -141,4 +141,26 @@ export function parseICalEvent(ics: string): ParsedICalEvent {
     else if (name === 'DTSTART') result.startIso = icalToDate(value);
   }
   return result;
+}
+
+export function parseICalEvent(ics: string): ParsedICalEvent {
+  return parseEventLines(unfold(ics));
+}
+
+// US-SY-12 — Import : un VCALENDAR peut contenir N VEVENT. On découpe sur
+// BEGIN/END:VEVENT (après dépliage) puis on parse chaque bloc. Les lignes
+// hors VEVENT (VTIMEZONE, en-tête VCALENDAR) sont ignorées.
+export function parseICalendar(ics: string): ParsedICalEvent[] {
+  const lines = unfold(ics);
+  const events: ParsedICalEvent[] = [];
+  let block: string[] | null = null;
+  for (const line of lines) {
+    const upper = line.toUpperCase().trim();
+    if (upper === 'BEGIN:VEVENT') block = [];
+    else if (upper === 'END:VEVENT') {
+      if (block) events.push(parseEventLines(block));
+      block = null;
+    } else if (block) block.push(line);
+  }
+  return events;
 }
