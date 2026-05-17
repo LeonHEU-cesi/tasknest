@@ -43,6 +43,10 @@ model User {
   notifyWebPush   Boolean @default(true) @map("notify_web_push")
   notifyEmail     Boolean @default(true) @map("notify_email")
 
+  // US-SY-11 — jeton du flux .ics d'abonnement (URL publique read-only,
+  // non devinable, rotable). Null = pas de flux actif.
+  icsFeedToken String? @unique @map("ics_feed_token")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

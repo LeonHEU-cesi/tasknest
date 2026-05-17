@@ -40,8 +40,10 @@ function unescapeText(s: string): string {
     .replace(/\\\\/g, '\\');
 }
 
-export function taskToICal(task: Task): string {
-  if (!task.dueAt) throw new Error('taskToICal: tâche sans dueAt');
+// Bloc VEVENT seul (sans l'enveloppe VCALENDAR) — réutilisé pour le PUT
+// CalDAV (un objet) ET l'export multi-événements (US-SY-10).
+export function taskToVevent(task: Task): string[] {
+  if (!task.dueAt) throw new Error('taskToVevent: tâche sans dueAt');
   const start = task.startAt ?? task.dueAt;
   const minutes = task.estimatedMinutes ?? DEFAULT_DURATION_MIN;
   const end =
@@ -49,10 +51,7 @@ export function taskToICal(task: Task): string {
       ? task.dueAt
       : new Date(start.getTime() + minutes * 60_000);
 
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    `PRODID:${PRODID}`,
+  return [
     'BEGIN:VEVENT',
     `UID:${taskUid(task.id)}`,
     `DTSTAMP:${icalDate(new Date())}`,
@@ -63,9 +62,33 @@ export function taskToICal(task: Task): string {
     // Tag explicite (en plus de l'UID) pour retrouver la tâche au pull.
     `X-TASKNEST-TASK-ID:${task.id}`,
     'END:VEVENT',
-    'END:VCALENDAR',
   ];
-  return lines.join('\r\n');
+}
+
+function wrapVcalendar(vevents: string[], calName?: string): string {
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    `PRODID:${PRODID}`,
+    'CALSCALE:GREGORIAN',
+    ...(calName ? [`X-WR-CALNAME:${escapeText(calName)}`] : []),
+    ...vevents,
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+export function taskToICal(task: Task): string {
+  return wrapVcalendar(taskToVevent(task));
+}
+
+// US-SY-10/11 — VCALENDAR multi-VEVENT (export liste/projet, feed
+// d'abonnement). Les tâches sans `dueAt` (pas d'horaire ⇒ pas de VEVENT)
+// sont ignorées silencieusement.
+export function tasksToICalendar(tasks: Task[], calName?: string): string {
+  const vevents = tasks
+    .filter((t) => t.dueAt)
+    .flatMap((t) => taskToVevent(t));
+  return wrapVcalendar(vevents, calName);
 }
 
 export interface ParsedICalEvent {
@@ -102,9 +125,9 @@ function icalToDate(value: string): string | undefined {
   ).toISOString();
 }
 
-export function parseICalEvent(ics: string): ParsedICalEvent {
+function parseEventLines(lines: string[]): ParsedICalEvent {
   const result: ParsedICalEvent = {};
-  for (const line of unfold(ics)) {
+  for (const line of lines) {
     const idx = line.indexOf(':');
     if (idx < 0) continue;
     const name = line.slice(0, idx).split(';')[0].toUpperCase();
@@ -118,4 +141,26 @@ export function parseICalEvent(ics: string): ParsedICalEvent {
     else if (name === 'DTSTART') result.startIso = icalToDate(value);
   }
   return result;
+}
+
+export function parseICalEvent(ics: string): ParsedICalEvent {
+  return parseEventLines(unfold(ics));
+}
+
+// US-SY-12 — Import : un VCALENDAR peut contenir N VEVENT. On découpe sur
+// BEGIN/END:VEVENT (après dépliage) puis on parse chaque bloc. Les lignes
+// hors VEVENT (VTIMEZONE, en-tête VCALENDAR) sont ignorées.
+export function parseICalendar(ics: string): ParsedICalEvent[] {
+  const lines = unfold(ics);
+  const events: ParsedICalEvent[] = [];
+  let block: string[] | null = null;
+  for (const line of lines) {
+    const upper = line.toUpperCase().trim();
+    if (upper === 'BEGIN:VEVENT') block = [];
+    else if (upper === 'END:VEVENT') {
+      if (block) events.push(parseEventLines(block));
+      block = null;
+    } else if (block) block.push(line);
+  }
+  return events;
 }

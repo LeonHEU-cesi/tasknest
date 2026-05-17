@@ -3,6 +3,43 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 15 — Export .ics universel
+
+### Issue #78 — [15.3] US-SY-12 Import .ics one-shot (fichier ou URL)
+
+- `parseICalendar` ajouté à `caldav-ical.mapper.ts` : découpe un VCALENDAR en N blocs VEVENT (après dépliage) et parse chacun (`parseEventLines` factorisé ; `parseICalEvent` inchangé pour CalDAV). VTIMEZONE/en-têtes ignorés.
+- `IcsImportService` : `preview` (parse sans persistance ⇒ candidats {title,dueAt,description}) + `confirm` (création `createMany` dans une liste **owner-scoped**). Source = `{ics}` brut (« upload fichier » lu côté client) **ou** `{url}` distante.
+- **Anti-SSRF** (sensibilité infra opérateur) : `assertSafeUrl` bloque localhost/`*.local`/`*.internal`/loopback/IP privées (10/172.16-31/192.168/169.254/IPv6 ULA/link-local)/metadata `169.254.169.254` ; `fetch` `redirect:'error'` + timeout 5 s + cap 2 Mo. Résiduel DNS-rebinding documenté (import déclenché par l'utilisateur lui-même).
+- DTOs class-validator (`ics` 1..2 000 000, `url` http(s) `require_protocol`, `listId` UUID). Contrôleur `import/ics/{preview,confirm}` (AuthGuard).
+
+Tests validés (201/201, +6)
+- `TF-SY-12` : preview multi-VEVENT (échappement + ligne pliée + VTIMEZONE ignoré, sans persistance), confirm crée owner-scoped, **404 cross-user**, **SSRF rejeté** (localhost/127/169.254/192.168/10 ⇒ 400), ni ics ni url ⇒ 400, protocole non http(s) ⇒ 400, 401.
+
+---
+
+### Issue #77 — [15.2] US-SY-11 URL d'abonnement .ics par compte
+
+- `User.icsFeedToken` (`@unique`, nullable) + migration. Token = `randomBytes(24).base64url` (non devinable, rotable, révocable).
+- `IcsExportService` : `enableFeed` (génère/rotation — purge le cache de l'ancien token ⇒ l'URL fuitée cesse aussitôt), `revokeFeed`, `feedStatus`, `feedByToken` (**cache serveur 5 min** par token).
+- `IcsExportController` (AuthGuard) : `POST /export/feed`, `GET /export/feed/status`, `DELETE /export/feed`. `IcsFeedController` **public sans AuthGuard** : `GET /feed/:token.ics` (les clients agenda n'envoient pas de cookie ; secret = token URL), `Cache-Control: private, max-age=300`.
+- Périmètre : flux backend (URL/token/cache). UI d'activation = polish mineur ultérieur (le bouton visible reste l'export #76).
+
+Tests validés (195/195, +2)
+- `TF-SY-11` : activation + path, flux public sans session, **cache 5 min** (tâche ajoutée après ⇒ absente jusqu'à rotation), rotation invalide l'ancien token (404) et sert le neuf à jour, révocation ⇒ 404 + status, token inconnu ⇒ 404, gestion exige une session (401).
+
+---
+
+### Issue #76 — [15.1] US-SY-10 Export .ics liste / projet (téléchargement)
+
+- Refactor `caldav-ical.mapper.ts` : extraction `taskToVevent` (bloc VEVENT seul) ⇒ `taskToICal` (1 event, CalDAV inchangé) + **`tasksToICalendar`** (VCALENDAR multi-VEVENT, `X-WR-CALNAME`, tâches sans `dueAt` ignorées). Zéro dépendance.
+- Module `ics-export` : `IcsExportService` (exportList/exportProject/exportAccount **owner-scoped**, tâches non archivées à échéance, triées) + `IcsExportController` `GET /export/lists/:id.ics` & `/export/projects/:id.ics` (AuthGuard, `text/calendar; charset=utf-8`, `Content-Disposition: attachment`, filename assaini).
+- Web : lien « Export .ics » (liste/projet) dans la vue Liste, ancre directe (cookie de session) ; helper `apiUrl()`.
+
+Tests validés (193/193, +4) — Playwright 6/6
+- `TF-SY-10` : VCALENDAR des tâches à échéance (sans-échéance & archivées exclues), agrégation projet, **404 cross-user**, 400 id non-UUID, 401.
+
+---
+
 ## Sprint 14 — Sync Apple CalDAV
 
 ### Issue #75 — [14.4] TS-SY-CALDAV + retry strategy
