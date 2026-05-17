@@ -5,6 +5,16 @@
 
 ## Sprint 16 — Partage / collaboration
 
+### Issue #81 — [16.3] US-SH-03 Liste collaborateurs + révocation
+
+- `SharingService.updateRole` / `revoke` (owner-only via `assertOwnedShare` = projet possédé + partage rattaché). Révocation = `status='revoked'` + `userId=null` (coupe l'accès — AccessService #82 ne prend que `accepted` — ligne conservée pour ré-invitation/traçabilité).
+- `SharingController` : `PATCH /projects/:projectId/shares/:shareId` (rôle), `DELETE /projects/:projectId/shares/:shareId` (204). DTO `UpdateShareDto`.
+
+Tests validés (213/213, +3)
+- `TF-SH-03` : liste avec rôle/statut/userId, changement de rôle, révocation (status revoked + userId null), non-propriétaire ⇒ 404, rôle invalide ⇒ 400, 401.
+
+---
+
 ### Issue #80 — [16.2] US-SH-02 Acceptation / refus invitation
 
 - `SharingService.preview` (aperçu public par token = secret), `accept` (AuthGuard ; lie `share.userId` au compte connecté — token et e-mail peuvent différer, schéma prévu ; **idempotent** si déjà accepté ; refuse si l'accepteur est le propriétaire), `decline` (sans compte — lien « non merci »).

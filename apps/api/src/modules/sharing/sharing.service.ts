@@ -120,6 +120,44 @@ export class SharingService {
     return shares.map((s) => this.toView(s));
   }
 
+  // US-SH-03 — Le partage doit appartenir à un projet possédé par l'appelant.
+  private async assertOwnedShare(
+    ownerId: string,
+    projectId: string,
+    shareId: string,
+  ) {
+    await this.assertOwnedProject(ownerId, projectId);
+    const share = await this.prisma.projectShare.findFirst({
+      where: { id: shareId, projectId },
+    });
+    if (!share) throw new NotFoundException('share-not-found');
+    return share;
+  }
+
+  async updateRole(
+    ownerId: string,
+    projectId: string,
+    shareId: string,
+    role: 'viewer' | 'editor',
+  ): Promise<ShareView> {
+    await this.assertOwnedShare(ownerId, projectId, shareId);
+    const updated = await this.prisma.projectShare.update({
+      where: { id: shareId },
+      data: { role },
+    });
+    return this.toView(updated);
+  }
+
+  // Révocation : coupe l'accès (AccessService ne prend que status=accepted)
+  // tout en gardant la ligne (ré-invitation possible, traçabilité).
+  async revoke(ownerId: string, projectId: string, shareId: string): Promise<void> {
+    await this.assertOwnedShare(ownerId, projectId, shareId);
+    await this.prisma.projectShare.update({
+      where: { id: shareId },
+      data: { status: 'revoked', userId: null, acceptedAt: null },
+    });
+  }
+
   // US-SH-02 — Aperçu public d'une invitation (le token EST le secret).
   async preview(token: string): Promise<{
     projectName: string;
