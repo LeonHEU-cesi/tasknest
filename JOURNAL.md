@@ -5,6 +5,15 @@
 
 ## Sprint 14 — Sync Apple CalDAV
 
+### Issue #75 — [14.4] TS-SY-CALDAV + retry strategy
+
+- Durci par le test : `validate` accepte désormais **207 Multi-Status** (réponse normale d'un PROPFIND — auparavant rejeté à tort). `isRetryableCaldav` ne rejoue **plus 501** Not Implemented (permanent : feature non supportée ⇒ repli immédiat, pas de retry inutile) ; 429/5xx restent rejouables avec `Retry-After`.
+- Suites unitaires (fetch/sleep mockés, ~25 ms) : `caldav.transport.spec` (isRetryable, parseMultistatus href/getetag/sync-token/404, 207 OK, 401 définitif, 429→retry+Retry-After, 5xx persistant, If-Match/If-None-Match + ETag, 404/412 absorbés, sync-collection 207 vs 501⇒unsupported) ; `caldav-ical.mapper.spec` (UID/href, round-trip, échappement RFC 5545, UID-fallback, dépliage de lignes).
+
+Tests validés (189/189, +15)
+
+---
+
 ### Issue #74 — [14.3] US-SY-09 Worker push/pull CalDAV générique
 
 - Le **repli ETag** (PROPFIND depth:1 + diff quand REPORT `sync-collection` est indisponible) est porté par `CaldavPullService` (livré #73). #74 = validation des serveurs sans sync-collection (Samsung / Radicale / Nextcloud anciens) : nouveau ⇒ ETag absent du mapping, modifié ⇒ ETag différent, supprimé ⇒ href disparu du listing.

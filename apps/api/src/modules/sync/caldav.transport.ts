@@ -64,10 +64,11 @@ const DEFAULT_MAX_RETRIES = 4;
 const DEFAULT_BASE_DELAY_MS = 500;
 const MAX_DELAY_MS = 8000;
 
-// 429 / 5xx rejouables ; le reste définitif (401 = identifiants, 404/412 =
-// gérés par l'appelant).
+// 429 / 5xx rejouables, SAUF 501 Not Implemented (permanent : le serveur ne
+// supporte pas la méthode/feature — ex. REPORT sync-collection ⇒ repli, pas
+// de retry). 401 = identifiants, 404/412 = gérés par l'appelant.
 export function isRetryableCaldav(status: number): boolean {
-  return status === 429 || status >= 500;
+  return status === 429 || (status >= 500 && status !== 501);
 }
 
 // Détection du type de serveur depuis l'URL (informatif, US-SY-07).
@@ -183,8 +184,8 @@ export class CaldavHttpTransport implements CaldavTransport {
       headers: { depth: '0', 'content-type': 'application/xml' },
       body: `<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/><d:current-user-principal/></d:prop></d:propfind>`,
     });
-    // 207 Multi-Status attendu ; tout 2xx convient.
-    if (res.status >= 300) {
+    // 207 Multi-Status attendu (PROPFIND) ; tout autre 2xx convient aussi.
+    if (res.status >= 300 && res.status !== 207) {
       throw new CaldavError(`PROPFIND inattendu: ${res.status}`, res.status, false);
     }
   }
