@@ -22,7 +22,10 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: leonheu97@gmail.com
+      # Placeholder uniquement — surchargé au déploiement par la variable
+      # ACME_EMAIL (flag CLI Traefik, cf. docker-compose.prod.yml). Aucune
+      # donnée personnelle / infra réelle dans le dépôt public.
+      email: admin@example.com
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web
