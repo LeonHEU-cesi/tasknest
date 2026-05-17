@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     command:
       - "--configFile=/etc/traefik/traefik.yml"
+      # E-mail ACME fourni par l'opérateur via .env (jamais commité).
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
     ports:
       - "80:80"
       - "443:443"
