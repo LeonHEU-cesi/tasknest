@@ -15,6 +15,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { SyncModule } from './modules/sync/sync.module';
 import { IcsExportModule } from './modules/ics-export/ics-export.module';
 import { SharingModule } from './modules/sharing/sharing.module';
+import { CommentsModule } from './modules/comments/comments.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { SharingModule } from './modules/sharing/sharing.module';
     SyncModule,
     IcsExportModule,
     SharingModule,
+    CommentsModule,
   ],
 })
 export class AppModule {}

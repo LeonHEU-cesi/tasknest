@@ -5,6 +5,17 @@
 
 ## Sprint 16 — Partage / collaboration
 
+### Issue #83 — [16.5] US-CO-01 Commentaires sur tâche (CRUD)
+
+- Modèle `Comment` (task/author, `@@index(taskId,createdAt)`) + migration. Relations Task/User.
+- `CommentsService` via `AccessService.requireTask` : lecture/création = **viewer+** (la discussion fait partie de la collab), édition = **auteur seul**, suppression = **auteur OU propriétaire du projet** (modération). 404 si pas d'accès (pas de divulgation).
+- `CommentsController` : `GET/POST /tasks/:taskId/comments`, `PATCH/DELETE /comments/:commentId` (AuthGuard). DTO `CommentBodyDto` (1..5000).
+
+Tests validés (218/218, +3)
+- collaborateur lit + commente, auteur édite, non-auteur ⇒ 403, stranger ⇒ 404 ; suppression auteur OK / propriétaire modère / sinon 403 ; DTO vide ⇒ 400 ; 401.
+
+---
+
 ### Issue #82 — [16.4] US-SH-04 Propagation des droits de partage + isolation
 
 - **`AccessService`** centralisé (`common/access/`, `@Global`) : `projectRole` (owner / editor / viewer via `ProjectShare` accepté, sinon null), `requireProject/List/Task(min)` (404 si pas d'accès — pas de divulgation —, 403 si rôle insuffisant), `accessibleProjectIds`. **RLS applicative** (cohérent avec tout le codebase ; pas de RLS Postgres — décision documentée).
