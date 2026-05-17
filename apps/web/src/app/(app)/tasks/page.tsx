@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { apiGet } from '@/lib/api-client';
+import { apiGet, apiUrl } from '@/lib/api-client';
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -124,6 +124,23 @@ export default function TasksListPage() {
           >
             Kanban →
           </Link>
+        ) : null}
+        {listId ? (
+          <a
+            href={apiUrl(`/export/lists/${listId}.ics`)}
+            data-testid="export-list-ics"
+            className="rounded border border-[var(--color-border)] px-3 py-1 text-sm"
+          >
+            Export .ics
+          </a>
+        ) : projectId ? (
+          <a
+            href={apiUrl(`/export/projects/${projectId}.ics`)}
+            data-testid="export-project-ics"
+            className="rounded border border-[var(--color-border)] px-3 py-1 text-sm"
+          >
+            Export .ics
+          </a>
         ) : null}
       </header>
 

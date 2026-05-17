@@ -27,6 +27,12 @@ function getBaseUrl(): string {
   return fromEnv.replace(/\/$/, '');
 }
 
+// URL absolue d'une route API — pour les liens directs (téléchargement
+// .ics, US-SY-10) où l'on s'appuie sur le cookie de session du navigateur.
+export function apiUrl(path: string): string {
+  return `${getBaseUrl()}/api/v1${path}`;
+}
+
 async function request<TResponse>(
   method: string,
   path: string,
