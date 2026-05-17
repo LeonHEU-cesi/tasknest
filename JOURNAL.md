@@ -5,6 +5,17 @@
 
 ## Sprint 16 — Partage / collaboration
 
+### Issue #82 — [16.4] US-SH-04 Propagation des droits de partage + isolation
+
+- **`AccessService`** centralisé (`common/access/`, `@Global`) : `projectRole` (owner / editor / viewer via `ProjectShare` accepté, sinon null), `requireProject/List/Task(min)` (404 si pas d'accès — pas de divulgation —, 403 si rôle insuffisant), `accessibleProjectIds`. **RLS applicative** (cohérent avec tout le codebase ; pas de RLS Postgres — décision documentée).
+- Refactor transverse projects/lists/tasks : lecture = viewer+, écriture tâches/listes = editor+, opérations structurelles projet = owner-only. Les requêtes data passent de `where {ownerId}` à un scope **par projet/liste** (l'accès est déjà gardé). Tâche/liste créée par un collaborateur ⇒ `ownerId = propriétaire du projet` (l'espace de données reste cohérent avec sync/export **owner-scoped**, qui restent personnels). **`/tasks/search` reste owner-scoped** (recherche transverse partagée = chantier ultérieur, documenté).
+- **Zéro régression** : les 213 tests mono-propriétaire passent inchangés (owner ≥ tous rôles, requêtes par projet/liste = mêmes lignes).
+
+Tests validés (215/215, +2)
+- `TS-SH-04` : viewer lit mais 403 en écriture, **isolation** du projet privé (404, pas 403), stranger 404 partout, editor écrit (tâche `ownerId`=propriétaire projet), projet owner-only même pour editor, search owner-scoped (collaborateur ⇒ []), **révocation coupe l'accès** (404).
+
+---
+
 ### Issue #81 — [16.3] US-SH-03 Liste collaborateurs + révocation
 
 - `SharingService.updateRole` / `revoke` (owner-only via `assertOwnedShare` = projet possédé + partage rattaché). Révocation = `status='revoked'` + `userId=null` (coupe l'accès — AccessService #82 ne prend que `accepted` — ligne conservée pour ré-invitation/traçabilité).
