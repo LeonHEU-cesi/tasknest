@@ -1,23 +1,44 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../db/prisma.service';
+import { AccessService, type Role } from '../../common/access/access.service';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
 import type { FilterTasksDto } from './dto/filter-tasks.dto';
 
-// US-TA-01..04 — Tâches scopées au propriétaire ; chaque opération vérifie
-// la possession de la liste / de la tâche.
+// US-TA-01..04 / US-SH-04 — Tâches scopées au PROJET : la lecture est
+// ouverte aux collaborateurs (viewer+), l'écriture à editor+. `ownerId`
+// d'une tâche = propriétaire du projet (l'espace de données du projet —
+// cohérent avec la sync/export owner-scoped, qui restent personnelles).
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
 
-  private async assertList(ownerId: string, listId: string) {
-    const list = await this.prisma.list.findFirst({ where: { id: listId, ownerId } });
-    if (!list) throw new NotFoundException('list-not-found');
+  // US-TG-02 — Tags exposés à plat (`tags: Tag[]`) dans les lectures.
+  private static readonly TAG_INCLUDE = { taskTags: { include: { tag: true } } } as const;
+
+  private withTags<T extends { taskTags?: { tag: unknown }[] }>(task: T) {
+    const { taskTags, ...rest } = task;
+    return { ...rest, tags: (taskTags ?? []).map((tt) => tt.tag) };
   }
 
-  async create(ownerId: string, listId: string, dto: CreateTaskDto) {
-    await this.assertList(ownerId, listId);
+  // Gate tâche : vérifie l'accès puis renvoie la tâche (avec tags) +
+  // l'ownerId du projet (pour les créations dérivées).
+  private async getTask(userId: string, id: string, min: Role) {
+    const { ownerId } = await this.access.requireTask(userId, id, min);
+    const task = await this.prisma.task.findUnique({
+      where: { id },
+      include: TasksService.TAG_INCLUDE,
+    });
+    if (!task) throw new NotFoundException('task-not-found');
+    return { task, projectOwnerId: ownerId };
+  }
+
+  async create(userId: string, listId: string, dto: CreateTaskDto) {
+    const { ownerId } = await this.access.requireList(userId, listId, 'editor');
     // US-TA-01 : position auto-assignée en fin de liste.
     const last = await this.prisma.task.aggregate({
       where: { listId },
@@ -38,18 +59,9 @@ export class TasksService {
     });
   }
 
-  // US-TG-02 — Tags exposés à plat (`tags: Tag[]`) dans les lectures.
-  private static readonly TAG_INCLUDE = { taskTags: { include: { tag: true } } } as const;
-
-  private withTags<T extends { taskTags?: { tag: unknown }[] }>(task: T) {
-    const { taskTags, ...rest } = task;
-    return { ...rest, tags: (taskTags ?? []).map((tt) => tt.tag) };
-  }
-
-  // US-TA-09/10, US-TG-03/04 — Filtres combinables (statut, tag, priorité,
-  // fenêtre due_at) + tri configurable.
-  async findAllForList(ownerId: string, listId: string, filter: FilterTasksDto = {}) {
-    await this.assertList(ownerId, listId);
+  // US-TA-09/10, US-TG-03/04 — Filtres combinables + tri configurable.
+  async findAllForList(userId: string, listId: string, filter: FilterTasksDto = {}) {
+    await this.access.requireList(userId, listId, 'viewer');
 
     const due: Prisma.DateTimeNullableFilter = {};
     if (filter.dueAfter) due.gte = new Date(filter.dueAfter);
@@ -57,7 +69,6 @@ export class TasksService {
 
     const where: Prisma.TaskWhereInput = {
       listId,
-      ownerId,
       archivedAt: null,
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.priority !== undefined ? { priority: filter.priority } : {}),
@@ -82,17 +93,13 @@ export class TasksService {
     return tasks.map((task) => this.withTags(task));
   }
 
-  async findOne(ownerId: string, id: string) {
-    const task = await this.prisma.task.findFirst({
-      where: { id, ownerId },
-      include: TasksService.TAG_INCLUDE,
-    });
-    if (!task) throw new NotFoundException('task-not-found');
+  async findOne(userId: string, id: string) {
+    const { task } = await this.getTask(userId, id, 'viewer');
     return this.withTags(task);
   }
 
-  // US-TA-08 — Recherche full-text sur title/description (ILIKE accéléré
-  // par les index GIN trigram), scopée au propriétaire, hors archivées.
+  // US-TA-08 — Recherche full-text. Reste **owner-scoped** (espace perso) :
+  // la recherche transverse aux projets partagés est un chantier ultérieur.
   async search(ownerId: string, query: string) {
     const q = query.trim();
     if (q.length === 0) return [];
@@ -110,12 +117,11 @@ export class TasksService {
     });
   }
 
-  // US-TA-05 — Réordonnancement intra-liste : position = index dans la
-  // liste fournie. Tous les ids doivent appartenir au owner + à la liste.
-  async reorder(ownerId: string, listId: string, orderedIds: string[]) {
-    await this.assertList(ownerId, listId);
+  // US-TA-05 — Réordonnancement intra-liste (editor+).
+  async reorder(userId: string, listId: string, orderedIds: string[]) {
+    await this.access.requireList(userId, listId, 'editor');
     const tasks = await this.prisma.task.findMany({
-      where: { id: { in: orderedIds }, listId, ownerId },
+      where: { id: { in: orderedIds }, listId },
       select: { id: true },
     });
     if (tasks.length !== orderedIds.length) {
@@ -126,17 +132,17 @@ export class TasksService {
         this.prisma.task.update({ where: { id: taskId }, data: { position: index } }),
       ),
     );
-    return this.findAllForList(ownerId, listId);
+    return this.findAllForList(userId, listId);
   }
 
   // US-TA-06 — Somme des estimations (minutes) d'une liste.
   async summaryForList(
-    ownerId: string,
+    userId: string,
     listId: string,
   ): Promise<{ count: number; totalEstimatedMinutes: number }> {
-    await this.assertList(ownerId, listId);
+    await this.access.requireList(userId, listId, 'viewer');
     const agg = await this.prisma.task.aggregate({
-      where: { listId, ownerId, archivedAt: null },
+      where: { listId, archivedAt: null },
       _count: true,
       _sum: { estimatedMinutes: true },
     });
@@ -146,8 +152,8 @@ export class TasksService {
     };
   }
 
-  async update(ownerId: string, id: string, dto: UpdateTaskDto) {
-    const current = await this.findOne(ownerId, id);
+  async update(userId: string, id: string, dto: UpdateTaskDto) {
+    const { task: current } = await this.getTask(userId, id, 'editor');
 
     const data: Prisma.TaskUpdateInput = {
       title: dto.title,
@@ -171,10 +177,10 @@ export class TasksService {
       }
     }
 
-    // US-TA-05 — Déplacement vers une autre liste (vérif possession cible),
+    // US-TA-05 — Déplacement vers une autre liste (accès editor à la cible),
     // repositionné en fin de liste destination.
     if (dto.listId && dto.listId !== current.listId) {
-      await this.assertList(ownerId, dto.listId);
+      await this.access.requireList(userId, dto.listId, 'editor');
       const last = await this.prisma.task.aggregate({
         where: { listId: dto.listId },
         _max: { position: true },
@@ -183,26 +189,24 @@ export class TasksService {
       data.position = (last._max.position ?? -1) + 1;
     }
 
-    // US-RE-03 — éditer une occurrence générée la transforme en exception
-    // (le générateur ne la régénère/écrase plus).
+    // US-RE-03 — éditer une occurrence générée la transforme en exception.
     if (current.occurrenceDate && current.recurrenceRuleId) {
       data.recurrenceException = true;
     }
 
     const updated = await this.prisma.task.update({ where: { id }, data });
 
-    // US-ST-03 : si une sous-tâche passe à done, compléter le parent quand
-    // toutes ses sous-tâches le sont (cascade vers le haut), si l'utilisateur
-    // ne l'a pas désactivé.
+    // US-ST-03 : complétion ascendante des parents si toutes les sous-tâches
+    // sont done (préférence de l'utilisateur qui agit).
     if (becameDone && current.parentTaskId) {
-      await this.maybeCompleteParents(ownerId, current.parentTaskId);
+      await this.maybeCompleteParents(userId, current.parentTaskId);
     }
     return updated;
   }
 
-  // US-ST-01 — Sous-tâche : tâche enfant rattachée au même list que le parent.
-  async createSubtask(ownerId: string, parentId: string, dto: CreateTaskDto) {
-    const parent = await this.findOne(ownerId, parentId);
+  // US-ST-01 — Sous-tâche : enfant rattaché au même list que le parent.
+  async createSubtask(userId: string, parentId: string, dto: CreateTaskDto) {
+    const { task: parent, projectOwnerId } = await this.getTask(userId, parentId, 'editor');
     const last = await this.prisma.task.aggregate({
       where: { parentTaskId: parentId },
       _max: { position: true },
@@ -211,7 +215,7 @@ export class TasksService {
       data: {
         listId: parent.listId,
         parentTaskId: parent.id,
-        ownerId,
+        ownerId: projectOwnerId,
         title: dto.title,
         description: dto.description,
         dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
@@ -224,17 +228,17 @@ export class TasksService {
   }
 
   // US-ST-02 — Enfants directs (pour l'affichage arborescent).
-  async getSubtasks(ownerId: string, parentId: string) {
-    await this.findOne(ownerId, parentId);
+  async getSubtasks(userId: string, parentId: string) {
+    await this.getTask(userId, parentId, 'viewer');
     return this.prisma.task.findMany({
-      where: { parentTaskId: parentId, ownerId, archivedAt: null },
+      where: { parentTaskId: parentId, archivedAt: null },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
   // US-ST-02 — Indicateur de progression « x/y sous-tâches done ».
-  async getProgress(ownerId: string, id: string): Promise<{ done: number; total: number }> {
-    await this.findOne(ownerId, id);
+  async getProgress(userId: string, id: string): Promise<{ done: number; total: number }> {
+    await this.getTask(userId, id, 'viewer');
     const children = await this.prisma.task.findMany({
       where: { parentTaskId: id, archivedAt: null },
       select: { status: true },
@@ -245,9 +249,9 @@ export class TasksService {
     };
   }
 
-  private async maybeCompleteParents(ownerId: string, parentTaskId: string): Promise<void> {
+  private async maybeCompleteParents(userId: string, parentTaskId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
-      where: { id: ownerId },
+      where: { id: userId },
       select: { autoCompleteSubtasks: true },
     });
     if (!user?.autoCompleteSubtasks) return;
@@ -255,8 +259,8 @@ export class TasksService {
     let currentParentId: string | null = parentTaskId;
     // Remonte tant qu'un parent bascule à done (profondeur illimitée).
     while (currentParentId) {
-      const parent = await this.prisma.task.findFirst({
-        where: { id: currentParentId, ownerId },
+      const parent = await this.prisma.task.findUnique({
+        where: { id: currentParentId },
       });
       if (!parent || parent.status === 'done' || parent.archivedAt) break;
 
@@ -276,10 +280,9 @@ export class TasksService {
     }
   }
 
-  // US-TA-07 — Assignation. Sans module de partage (sprint 16), on valide
-  // simplement que l'assigné est un compte existant non supprimé.
-  async assign(ownerId: string, id: string, assigneeId: string) {
-    await this.findOne(ownerId, id);
+  // US-TA-07 — Assignation : l'assigné doit être un compte existant.
+  async assign(userId: string, id: string, assigneeId: string) {
+    await this.access.requireTask(userId, id, 'editor');
     const assignee = await this.prisma.user.findFirst({
       where: { id: assigneeId, deletedAt: null },
       select: { id: true },
@@ -288,19 +291,20 @@ export class TasksService {
     return this.prisma.task.update({ where: { id }, data: { assignedTo: assigneeId } });
   }
 
-  async unassign(ownerId: string, id: string) {
-    await this.findOne(ownerId, id);
+  async unassign(userId: string, id: string) {
+    await this.access.requireTask(userId, id, 'editor');
     return this.prisma.task.update({ where: { id }, data: { assignedTo: null } });
   }
 
-  // US-TG-02 — Remplace l'ensemble des tags d'une tâche (idempotent).
-  // Tous les tagIds doivent appartenir au propriétaire.
-  async setTags(ownerId: string, taskId: string, tagIds: string[]) {
-    await this.findOne(ownerId, taskId);
+  // US-TG-02 — Remplace l'ensemble des tags d'une tâche (idempotent). Les
+  // tags appartiennent au propriétaire du projet (un collaborateur applique
+  // les tags du projet).
+  async setTags(userId: string, taskId: string, tagIds: string[]) {
+    const { projectOwnerId } = await this.getTask(userId, taskId, 'editor');
     const uniqueIds = [...new Set(tagIds)];
     if (uniqueIds.length > 0) {
       const owned = await this.prisma.tag.count({
-        where: { id: { in: uniqueIds }, ownerId },
+        where: { id: { in: uniqueIds }, ownerId: projectOwnerId },
       });
       if (owned !== uniqueIds.length) throw new NotFoundException('tag-not-found');
     }
@@ -310,14 +314,13 @@ export class TasksService {
         data: uniqueIds.map((tagId) => ({ taskId, tagId })),
       }),
     ]);
-    return this.findOne(ownerId, taskId);
+    return this.findOne(userId, taskId);
   }
 
   // US-TA-04 — Soft-delete (archive) + restauration tant que non purgée.
-  // US-RE-04 — supprimer une occurrence : on l'archive ET on la marque
-  // exception (la ligne reste en tombstone ⇒ le générateur ne la recrée pas).
-  async archive(ownerId: string, id: string) {
-    const current = await this.findOne(ownerId, id);
+  // US-RE-04 — supprimer une occurrence : archive + marque exception.
+  async archive(userId: string, id: string) {
+    const { task: current } = await this.getTask(userId, id, 'editor');
     const isOccurrence = Boolean(current.occurrenceDate && current.recurrenceRuleId);
     return this.prisma.task.update({
       where: { id },
@@ -325,8 +328,8 @@ export class TasksService {
     });
   }
 
-  async restore(ownerId: string, id: string) {
-    await this.findOne(ownerId, id);
+  async restore(userId: string, id: string) {
+    await this.access.requireTask(userId, id, 'editor');
     return this.prisma.task.update({ where: { id }, data: { archivedAt: null } });
   }
 }

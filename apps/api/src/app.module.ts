@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './db/prisma.module';
+import { AccessModule } from './common/access/access.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
 import { AuthModule } from './auth/auth.module';
@@ -22,6 +23,7 @@ import { SharingModule } from './modules/sharing/sharing.module';
       envFilePath: ['.env', '../../.env'],
     }),
     PrismaModule,
+    AccessModule,
     MailModule,
     HealthModule,
     AuthModule,
