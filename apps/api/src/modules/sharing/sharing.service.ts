@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
+  GoneException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -116,5 +118,77 @@ export class SharingService {
       orderBy: { createdAt: 'asc' },
     });
     return shares.map((s) => this.toView(s));
+  }
+
+  // US-SH-02 — Aperçu public d'une invitation (le token EST le secret).
+  async preview(token: string): Promise<{
+    projectName: string;
+    invitedEmail: string;
+    role: string;
+    status: string;
+    expired: boolean;
+  }> {
+    const share = await this.prisma.projectShare.findUnique({
+      where: { token },
+      include: { project: true },
+    });
+    if (!share) throw new NotFoundException('invite-not-found');
+    return {
+      projectName: share.project.name,
+      invitedEmail: share.invitedEmail,
+      role: share.role,
+      status: share.status,
+      expired: share.expiresAt.getTime() < Date.now(),
+    };
+  }
+
+  private async loadActionable(token: string) {
+    const share = await this.prisma.projectShare.findUnique({ where: { token } });
+    if (!share) throw new NotFoundException('invite-not-found');
+    if (share.status === 'revoked') {
+      throw new ConflictException('invite-revoked');
+    }
+    if (share.status === 'declined') {
+      throw new ConflictException('invite-declined');
+    }
+    if (share.expiresAt.getTime() < Date.now()) {
+      throw new GoneException('invite-expired');
+    }
+    return share;
+  }
+
+  // US-SH-02 — Acceptation : lie le partage au compte connecté (le token
+  // peut avoir été envoyé à un e-mail différent du compte ⇒ on lie au
+  // compte qui détient le lien, schéma prévu pour ça).
+  async accept(userId: string, token: string): Promise<ShareView> {
+    const share = await this.loadActionable(token);
+    if (share.status === 'accepted') {
+      return this.toView(share); // idempotent
+    }
+    const owner = await this.prisma.project.findUnique({
+      where: { id: share.projectId },
+      select: { ownerId: true },
+    });
+    if (owner?.ownerId === userId) {
+      throw new BadRequestException('You already own this project');
+    }
+    const updated = await this.prisma.projectShare.update({
+      where: { id: share.id },
+      data: { status: 'accepted', userId, acceptedAt: new Date() },
+    });
+    return this.toView(updated);
+  }
+
+  // US-SH-02 — Refus : ne nécessite pas de compte (lien « non merci »).
+  async decline(token: string): Promise<{ status: string }> {
+    const share = await this.loadActionable(token);
+    if (share.status === 'accepted') {
+      throw new ConflictException('invite-already-accepted');
+    }
+    await this.prisma.projectShare.update({
+      where: { id: share.id },
+      data: { status: 'declined' },
+    });
+    return { status: 'declined' };
   }
 }
