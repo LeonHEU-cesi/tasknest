@@ -12,11 +12,12 @@ We pledge to make participation in the Tasknest community a respectful, inclusiv
 
 ## Reporting
 
-Instances of unacceptable behaviour may be reported privately to the project maintainer at:
+Instances of unacceptable behaviour may be reported privately to the
+project maintainers via a
+**[private GitHub Security Advisory](https://github.com/LeonHEU-cesi/tasknest/security/advisories/new)**
+(it is private to the maintainers and works for conduct reports too).
 
-📧 `leonheu97@gmail.com`
-
-All complaints will be reviewed and investigated promptly and fairly. The maintainer is obligated to respect the privacy and security of the reporter of any incident.
+All complaints will be reviewed and investigated promptly and fairly. The maintainers are obligated to respect the privacy and security of the reporter of any incident.
 
 ## Enforcement
 

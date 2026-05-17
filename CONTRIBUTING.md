@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Tasknest! This document outlines 
 
 ## Code of conduct
 
-This project follows the [Contributor Covenant 2.1](./CODE_OF_CONDUCT.md). By participating, you agree to uphold this code. Please report unacceptable behaviour to `leonheu97@gmail.com`.
+This project follows the [Contributor Covenant 2.1](./CODE_OF_CONDUCT.md). By participating, you agree to uphold this code. Please report unacceptable behaviour via a [private GitHub Security Advisory](https://github.com/LeonHEU-cesi/tasknest/security/advisories/new) (see [SECURITY.md](./SECURITY.md)).
 
 ---
 
@@ -173,4 +173,4 @@ By contributing to Tasknest, you agree that your contributions will be licensed 
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/LeonHEU-cesi/tasknest/discussions) or reach out at `leonheu97@gmail.com`. We're happy to help newcomers.
+Open a [GitHub Discussion](https://github.com/LeonHEU-cesi/tasknest/discussions) or a [GitHub Issue](https://github.com/LeonHEU-cesi/tasknest/issues). We're happy to help newcomers.

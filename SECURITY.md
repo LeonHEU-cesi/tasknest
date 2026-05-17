@@ -15,9 +15,10 @@ Tasknest is in pre-alpha development. Until the first stable release (`v1.0.0`),
 
 **Please do not open a public issue for security vulnerabilities.**
 
-If you discover a security issue, please report it privately by emailing:
-
-📧 **`leonheu97+security@gmail.com`**
+If you discover a security issue, please report it privately through
+**[GitHub Security Advisories](https://github.com/LeonHEU-cesi/tasknest/security/advisories/new)**
+(Security → Report a vulnerability). This keeps the report private to the
+maintainers and is the preferred channel.
 
 Include:
 
