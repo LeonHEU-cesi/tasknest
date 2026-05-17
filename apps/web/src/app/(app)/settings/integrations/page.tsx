@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ApiClientError, apiDelete, apiGet, apiPost } from '@/lib/api-client';
 
 // US-SY-01 / US-SY-04 — Connexion des agendas externes (Google, Outlook).
@@ -108,6 +108,126 @@ function IntegrationCard({
   );
 }
 
+interface CaldavStatus {
+  connected: boolean;
+  kind?: string;
+  url?: string;
+}
+
+// US-SY-07 — CalDAV : pas de bouton OAuth, un formulaire (URL + identifiant
+// + app-password). Le mot de passe est chiffré au repos côté serveur.
+function CaldavCard() {
+  const [status, setStatus] = useState<CaldavStatus | null>(null);
+  const [url, setUrl] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () =>
+    apiGet<CaldavStatus>('/integrations/caldav/status')
+      .then(setStatus)
+      .catch(() => setStatus({ connected: false }));
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const connect = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await apiPost<
+        { url: string; username: string; password: string },
+        CaldavStatus
+      >('/integrations/caldav/connect', { url, username, password });
+      setStatus(next);
+      setPassword('');
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : 'Could not connect CalDAV.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnect = async () => {
+    setBusy(true);
+    try {
+      await apiDelete('/integrations/caldav');
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section
+      className="mt-4 rounded border border-[var(--color-border)] p-4"
+      data-testid="integration-caldav"
+    >
+      <p className="font-medium">CalDAV (iCloud, Nextcloud, Samsung…)</p>
+      <p className="text-sm text-[var(--color-muted)]" data-testid="caldav-state">
+        {status?.connected
+          ? `Connected (${status.kind ?? 'generic'})`
+          : 'Not connected'}
+      </p>
+
+      {status?.connected ? (
+        <button
+          type="button"
+          onClick={disconnect}
+          disabled={busy}
+          className="mt-3 rounded border border-[var(--color-border)] px-3 py-1 disabled:opacity-60"
+        >
+          Disconnect
+        </button>
+      ) : (
+        <form onSubmit={connect} className="mt-3 flex flex-col gap-2">
+          <input
+            type="url"
+            required
+            placeholder="CalDAV calendar URL"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className="rounded border border-[var(--color-border)] px-2 py-1"
+          />
+          <input
+            type="text"
+            required
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="rounded border border-[var(--color-border)] px-2 py-1"
+          />
+          <input
+            type="password"
+            required
+            placeholder="App password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="rounded border border-[var(--color-border)] px-2 py-1"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded border border-[var(--color-border)] px-3 py-1 disabled:opacity-60"
+          >
+            {busy ? 'Connecting…' : 'Connect'}
+          </button>
+        </form>
+      )}
+      <p className="mt-3 text-xs text-[var(--color-muted)]">
+        The app password is encrypted at rest and only used to reach your
+        CalDAV server.
+      </p>
+      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+    </section>
+  );
+}
+
 export default function IntegrationsPage() {
   return (
     <main className="mx-auto max-w-xl p-6" data-testid="integrations">
@@ -118,6 +238,7 @@ export default function IntegrationsPage() {
         slug="microsoft"
         base="/integrations/microsoft"
       />
+      <CaldavCard />
     </main>
   );
 }

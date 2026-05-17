@@ -5,6 +5,8 @@ import { GooglePushService } from './google-push.service';
 import { GooglePullService } from './google-pull.service';
 import { MicrosoftPushService } from './microsoft-push.service';
 import { MicrosoftPullService } from './microsoft-pull.service';
+import { CaldavPushService } from './caldav-push.service';
+import { CaldavPullService } from './caldav-pull.service';
 
 // US-SY-02/03 — Cron BullMQ : push tâches→Google puis pull Google→tâches
 // (tous les comptes connectés). Le webhook watch donne le quasi-temps réel ;
@@ -26,6 +28,8 @@ export class SyncQueue implements OnModuleInit, OnModuleDestroy {
     private readonly pull: GooglePullService,
     private readonly msPush: MicrosoftPushService,
     private readonly msPull: MicrosoftPullService,
+    private readonly cdPush: CaldavPushService,
+    private readonly cdPull: CaldavPullService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -45,10 +49,13 @@ export class SyncQueue implements OnModuleInit, OnModuleDestroy {
           const g = await this.pull.pullAll();
           const mp = await this.msPush.pushAll();
           const mg = await this.msPull.pullAll();
+          const cp = await this.cdPush.pushAll();
+          const cg = await this.cdPull.pullAll();
           this.logger.log(
             `Sync : Google push +${p.created} ~${p.updated} -${p.deleted} ` +
               `pull ~${g.updated} -${g.archived} | MS push +${mp.created} ~${mp.updated} -${mp.deleted} ` +
-              `pull ~${mg.updated} -${mg.archived}`,
+              `pull ~${mg.updated} -${mg.archived} | CalDAV push +${cp.created} ~${cp.updated} -${cp.deleted} ` +
+              `pull ~${cg.updated} -${cg.archived}`,
           );
         },
         { connection },
