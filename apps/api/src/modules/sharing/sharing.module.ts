@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { MailModule } from '../mail/mail.module';
 import { SharingService } from './sharing.service';
 import { SharingController } from './sharing.controller';
+import { InvitesController } from './invites.controller';
 
 // US-SH-01..04 / US-CO-* — Partage de projet & collaboration.
 @Module({
   imports: [MailModule],
-  controllers: [SharingController],
+  controllers: [SharingController, InvitesController],
   providers: [SharingService],
   exports: [SharingService],
 })

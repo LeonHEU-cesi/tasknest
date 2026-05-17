@@ -5,6 +5,17 @@
 
 ## Sprint 16 — Partage / collaboration
 
+### Issue #80 — [16.2] US-SH-02 Acceptation / refus invitation
+
+- `SharingService.preview` (aperçu public par token = secret), `accept` (AuthGuard ; lie `share.userId` au compte connecté — token et e-mail peuvent différer, schéma prévu ; **idempotent** si déjà accepté ; refuse si l'accepteur est le propriétaire), `decline` (sans compte — lien « non merci »).
+- `loadActionable` centralise la validation : révoqué ⇒ 409, refusé ⇒ 409, expiré ⇒ 410, inconnu ⇒ 404.
+- `InvitesController` : `GET /invites/:token` (public), `POST /invites/:token/accept` (AuthGuard), `POST /invites/:token/decline` (public, 200).
+
+Tests validés (210/210, +4)
+- `TF-SH-02` : aperçu public, accept lie le compte + idempotent, 401 sans session, decline sans compte puis accept ⇒ 409, révoqué ⇒ 409 / expiré ⇒ 410 / inconnu ⇒ 404, propriétaire ne peut pas accepter son propre projet ⇒ 400.
+
+---
+
 ### Issue #79 — [16.1] US-SH-01 Invitation projet par e-mail (viewer/editor)
 
 - Modèle `ProjectShare` (`@@unique(projectId,invitedEmail)`, statut pending/accepted/declined/revoked, token unique, role viewer/editor, `expiresAt` 7 j, `userId` lié à l'acceptation) + migration. Relations Project/User.
