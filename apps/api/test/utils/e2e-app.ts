@@ -37,6 +37,15 @@ export class MailCapture {
     this.digests.set(to, html);
   };
 
+  // US-SH-01 — invitation de partage : on capture l'URL d'acceptation.
+  readonly shareInvites = new Map<string, string>();
+  sendShareInviteEmail = async (
+    to: string,
+    inviteUrl: string,
+  ): Promise<void> => {
+    this.shareInvites.set(to, inviteUrl);
+  };
+
   sendPasswordChangedEmail = async (): Promise<void> => undefined;
 
   // verify-email : token en query (?token=). request-password-reset :
@@ -90,8 +99,10 @@ export async function createE2EApp(): Promise<E2EContext> {
 
 // Ordre FK-safe (account/session/verification + sync dépendent de user).
 export async function resetDb(prisma: PrismaService): Promise<void> {
+  await prisma.comment.deleteMany();
   await prisma.syncEvent.deleteMany();
   await prisma.calendarAccount.deleteMany();
+  await prisma.projectShare.deleteMany();
   await prisma.account.deleteMany();
   await prisma.session.deleteMany();
   await prisma.verification.deleteMany();

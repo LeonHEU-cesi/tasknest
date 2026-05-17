@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './db/prisma.module';
+import { AccessModule } from './common/access/access.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
 import { AuthModule } from './auth/auth.module';
@@ -13,6 +14,8 @@ import { RecurrenceModule } from './modules/recurrence/recurrence.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { IcsExportModule } from './modules/ics-export/ics-export.module';
+import { SharingModule } from './modules/sharing/sharing.module';
+import { CommentsModule } from './modules/comments/comments.module';
 
 @Module({
   imports: [
@@ -21,6 +24,7 @@ import { IcsExportModule } from './modules/ics-export/ics-export.module';
       envFilePath: ['.env', '../../.env'],
     }),
     PrismaModule,
+    AccessModule,
     MailModule,
     HealthModule,
     AuthModule,
@@ -33,6 +37,8 @@ import { IcsExportModule } from './modules/ics-export/ics-export.module';
     NotificationsModule,
     SyncModule,
     IcsExportModule,
+    SharingModule,
+    CommentsModule,
   ],
 })
 export class AppModule {}

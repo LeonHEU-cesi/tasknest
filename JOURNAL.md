@@ -3,6 +3,72 @@
 > Journal narratif du projet, organisé par sprint puis par issue.
 > Format : H2 = Sprint, H3 = Issue, séparateur `---` entre issues, **sans date** (l'historique git fait foi).
 
+## Sprint 16 — Partage / collaboration
+
+### Issue #84 — [16.6] US-CO-02 Mentions @user dans commentaire + notif
+
+- Parsing `@email` (e-mails uniques ⇒ non ambigu) à la création d'un commentaire. Notification `type='comment'` `channel='in_app'` (`sentAt=now` ⇒ visible immédiatement dans le centre in-app) créée **uniquement** pour les comptes ayant réellement accès au projet (`AccessService.projectRole != null`), jamais l'auteur, jamais une adresse arbitraire. `scheduledFor` distinct par mention (contrainte unique `(task,type,scheduledFor)` ⇒ pas de collision).
+- Mention sur édition non gérée (création seulement — documenté).
+
+Tests validés (220/220, +2)
+- mention d'un collaborateur ⇒ notif in-app (payload `byName`), outsider sans accès ⇒ aucune notif, auto-mention ⇒ aucune, commentaire sans mention ⇒ aucune.
+
+---
+
+### Issue #83 — [16.5] US-CO-01 Commentaires sur tâche (CRUD)
+
+- Modèle `Comment` (task/author, `@@index(taskId,createdAt)`) + migration. Relations Task/User.
+- `CommentsService` via `AccessService.requireTask` : lecture/création = **viewer+** (la discussion fait partie de la collab), édition = **auteur seul**, suppression = **auteur OU propriétaire du projet** (modération). 404 si pas d'accès (pas de divulgation).
+- `CommentsController` : `GET/POST /tasks/:taskId/comments`, `PATCH/DELETE /comments/:commentId` (AuthGuard). DTO `CommentBodyDto` (1..5000).
+
+Tests validés (218/218, +3)
+- collaborateur lit + commente, auteur édite, non-auteur ⇒ 403, stranger ⇒ 404 ; suppression auteur OK / propriétaire modère / sinon 403 ; DTO vide ⇒ 400 ; 401.
+
+---
+
+### Issue #82 — [16.4] US-SH-04 Propagation des droits de partage + isolation
+
+- **`AccessService`** centralisé (`common/access/`, `@Global`) : `projectRole` (owner / editor / viewer via `ProjectShare` accepté, sinon null), `requireProject/List/Task(min)` (404 si pas d'accès — pas de divulgation —, 403 si rôle insuffisant), `accessibleProjectIds`. **RLS applicative** (cohérent avec tout le codebase ; pas de RLS Postgres — décision documentée).
+- Refactor transverse projects/lists/tasks : lecture = viewer+, écriture tâches/listes = editor+, opérations structurelles projet = owner-only. Les requêtes data passent de `where {ownerId}` à un scope **par projet/liste** (l'accès est déjà gardé). Tâche/liste créée par un collaborateur ⇒ `ownerId = propriétaire du projet` (l'espace de données reste cohérent avec sync/export **owner-scoped**, qui restent personnels). **`/tasks/search` reste owner-scoped** (recherche transverse partagée = chantier ultérieur, documenté).
+- **Zéro régression** : les 213 tests mono-propriétaire passent inchangés (owner ≥ tous rôles, requêtes par projet/liste = mêmes lignes).
+
+Tests validés (215/215, +2)
+- `TS-SH-04` : viewer lit mais 403 en écriture, **isolation** du projet privé (404, pas 403), stranger 404 partout, editor écrit (tâche `ownerId`=propriétaire projet), projet owner-only même pour editor, search owner-scoped (collaborateur ⇒ []), **révocation coupe l'accès** (404).
+
+---
+
+### Issue #81 — [16.3] US-SH-03 Liste collaborateurs + révocation
+
+- `SharingService.updateRole` / `revoke` (owner-only via `assertOwnedShare` = projet possédé + partage rattaché). Révocation = `status='revoked'` + `userId=null` (coupe l'accès — AccessService #82 ne prend que `accepted` — ligne conservée pour ré-invitation/traçabilité).
+- `SharingController` : `PATCH /projects/:projectId/shares/:shareId` (rôle), `DELETE /projects/:projectId/shares/:shareId` (204). DTO `UpdateShareDto`.
+
+Tests validés (213/213, +3)
+- `TF-SH-03` : liste avec rôle/statut/userId, changement de rôle, révocation (status revoked + userId null), non-propriétaire ⇒ 404, rôle invalide ⇒ 400, 401.
+
+---
+
+### Issue #80 — [16.2] US-SH-02 Acceptation / refus invitation
+
+- `SharingService.preview` (aperçu public par token = secret), `accept` (AuthGuard ; lie `share.userId` au compte connecté — token et e-mail peuvent différer, schéma prévu ; **idempotent** si déjà accepté ; refuse si l'accepteur est le propriétaire), `decline` (sans compte — lien « non merci »).
+- `loadActionable` centralise la validation : révoqué ⇒ 409, refusé ⇒ 409, expiré ⇒ 410, inconnu ⇒ 404.
+- `InvitesController` : `GET /invites/:token` (public), `POST /invites/:token/accept` (AuthGuard), `POST /invites/:token/decline` (public, 200).
+
+Tests validés (210/210, +4)
+- `TF-SH-02` : aperçu public, accept lie le compte + idempotent, 401 sans session, decline sans compte puis accept ⇒ 409, révoqué ⇒ 409 / expiré ⇒ 410 / inconnu ⇒ 404, propriétaire ne peut pas accepter son propre projet ⇒ 400.
+
+---
+
+### Issue #79 — [16.1] US-SH-01 Invitation projet par e-mail (viewer/editor)
+
+- Modèle `ProjectShare` (`@@unique(projectId,invitedEmail)`, statut pending/accepted/declined/revoked, token unique, role viewer/editor, `expiresAt` 7 j, `userId` lié à l'acceptation) + migration. Relations Project/User.
+- Module `sharing` : `SharingService.invite` (owner-only, **upsert** sur (projet,e-mail) ⇒ ré-invitation sans doublon, token/rôle rafraîchis, refus d'inviter sa propre adresse) + `list`. `MailService.sendShareInviteEmail` (lien `${WEB_PUBLIC_URL}/invites/<token>`). Token jamais exposé par l'API (uniquement dans l'e-mail).
+- `SharingController` `POST/GET /projects/:projectId/shares` (AuthGuard, owner-only).
+
+Tests validés (206/206, +5)
+- `TF-SH-01` : invite + e-mail capturé avec token, listing, ré-invitation = upsert, auto-invitation ⇒ 400, non-propriétaire ⇒ 404, DTO invalide ⇒ 400, 401.
+
+---
+
 ## Sprint 15 — Export .ics universel
 
 ### Issue #78 — [15.3] US-SY-12 Import .ics one-shot (fichier ou URL)
